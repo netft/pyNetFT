@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='pynetft',
-    version='1.0.0',
+    version='1.0.1',
     author='Xudong Han',
     description='Python library for controlling LK motors',
     long_description=open("README.md").read(),

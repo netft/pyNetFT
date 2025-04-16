@@ -21,7 +21,7 @@ class Response:
 
 
 class NetFT:
-    def __init__(self, host, port=49152, num_samples=1):
+    def __init__(self, host, port: int = 49152, num_samples: int = 1, count_per_force : int = 1000000, count_per_toque: int = 999.999):
         """Initialize the NetFT object
 
         Args:
@@ -46,6 +46,9 @@ class NetFT:
         self.is_connected = False
         self.AXES = ["Fx", "Fy", "Fz", "Tx", "Ty", "Tz"]
         self.response = Response()
+        self.count_per_force = count_per_force
+        self.count_per_toque = count_per_toque
+        
 
     def connect(self):
         """Create and connect the UDP socket
@@ -156,6 +159,32 @@ class NetFT:
 
         self._send_request()
         return self._receive_data()
+    
+    def get_real_data(self):
+        """Get the real data
+
+        Converts the raw data to real values based on the provided counts
+
+        Returns:
+            list: The converted Force/Torque data
+        """
+
+        resp = self.get_data()
+        
+        ft_data = resp.FTData
+        # Convert raw data to real values
+        real_data = [
+            ft_data[0] / self.count_per_force,
+            ft_data[1] / self.count_per_force,
+            ft_data[2] / self.count_per_force,
+            ft_data[3] / self.count_per_toque,
+            ft_data[4] / self.count_per_toque,
+            ft_data[5] / self.count_per_toque
+        ]
+        
+        resp.FTData = real_data
+        
+        return resp
 
     def start_streaming(self, duration=10, delay=0.1, print_data=True):
         """Continuously read and print data until the specified time is reached
@@ -168,8 +197,7 @@ class NetFT:
 
         start_time = time.time()
         while time.time() - start_time < duration:
-            self._send_request()
-            resp = self._receive_data()
+            resp = self.get_real_data()
             if resp and print_data:
                 self._print_data(resp)
             time.sleep(delay)
@@ -179,7 +207,7 @@ class NetFT:
 # Example usage
 if __name__ == "__main__":
     # Create NetFT object
-    netft = NetFT(host="192.168.1.1")  # Replace with your device's IP
+    netft = NetFT(host="192.168.1.1", count_per_force=1000000, count_per_toque=999.999)  # Replace with your device's IP
 
     # Connect to the device
     netft.connect()
