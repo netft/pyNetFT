@@ -21,7 +21,7 @@ class Response:
 
 
 class NetFT:
-    def __init__(self, host, port: int = 49152, num_samples: int = 1, count_per_force : int = 1000000, count_per_toque: int = 999.999):
+    def __init__(self, host, port: int = 49152, num_samples: int = 1, count_per_force : int = 1000000, count_per_torque: int = 999.999):
         """Initialize the NetFT object
 
         Args:
@@ -47,7 +47,7 @@ class NetFT:
         self.AXES = ["Fx", "Fy", "Fz", "Tx", "Ty", "Tz"]
         self.response = Response()
         self.count_per_force = count_per_force
-        self.count_per_toque = count_per_toque
+        self.count_per_torque = count_per_torque
         
 
     def connect(self):
@@ -177,9 +177,9 @@ class NetFT:
             ft_data[0] / self.count_per_force,
             ft_data[1] / self.count_per_force,
             ft_data[2] / self.count_per_force,
-            ft_data[3] / self.count_per_toque,
-            ft_data[4] / self.count_per_toque,
-            ft_data[5] / self.count_per_toque
+            ft_data[3] / self.count_per_torque,
+            ft_data[4] / self.count_per_torque,
+            ft_data[5] / self.count_per_torque
         ]
         
         resp.FTData = real_data
@@ -207,7 +207,7 @@ class NetFT:
 # Example usage
 if __name__ == "__main__":
     # Create NetFT object
-    netft = NetFT(host="192.168.1.1", count_per_force=1000000, count_per_toque=999.999)  # Replace with your device's IP
+    netft = NetFT(host="192.168.1.1", count_per_force=1000000, count_per_torque=999.999)  # Replace with your device's IP
 
     # Connect to the device
     netft.connect()
