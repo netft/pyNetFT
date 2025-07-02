@@ -32,8 +32,7 @@ from pynetft import NetFT
 
 netft = NetFT(
     host='192.168.1.1', 
-    tcp_port=49151,
-    udp_port=49152,
+    port=49152,
     count_per_force=1000000,
     count_per_torque=999.999,
 )
