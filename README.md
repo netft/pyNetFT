@@ -2,8 +2,8 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/pynetft.svg?logo=pypi&logoColor=white)](https://pypi.org/project/pynetft/)
 [![Python version](https://img.shields.io/pypi/pyversions/pynetft.svg?logo=python&logoColor=white)](https://pypi.org/project/pynetft/)
-[![Github](https://img.shields.io/badge/Github-pyNetFT-purple?logo=github&logoColor=white)](https://github.com/han-xudong/pyNetFT)
-[![License](https://img.shields.io/github/license/han-xudong/pyNetFT.svg?logo=open-source-initiative&logoColor=white)](LICENSE)
+[![Github](https://img.shields.io/badge/Github-pyNetFT-purple?logo=github&logoColor=white)](https://github.com/netft/pyNetFT)
+[![License](https://img.shields.io/github/license/netft/pyNetFT.svg?logo=open-source-initiative&logoColor=white)](LICENSE)
 
 This is a Python interface for the ATI force/torque sensor with Net F/T. It allows you to read the force and torque data from the sensor in real-time.
 
@@ -18,7 +18,7 @@ pip install pynetft
 Or you can install it from the source code:
 
 ```bash
-git clone https://github.com/han-xudong/pyNetFT.git
+git clone https://github.com/netft/pyNetFT.git
 cd pyNetFT
 pip install .
 ```
