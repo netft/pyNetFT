@@ -1,3 +1,91 @@
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = [
+  "scikit-build-core>=0.11,<1",
+  "pybind11>=2.13,<3",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "pynetft"
+version = "2.0.0"
+description = "Python client for ATI Net F/T Ethernet force/torque sensors"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE", "LICENSES/*", "core/LICENSE"]
+authors = [{ name = "Xudong Han" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: C++",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/netft/pyNetFT"
+Documentation = "https://github.com/netft/pyNetFT/blob/main/docs/api.md"
+Issues = "https://github.com/netft/pyNetFT/issues"
+Source = "https://github.com/netft/pyNetFT"
+Changelog = "https://github.com/netft/pyNetFT/blob/main/CHANGELOG.md"
+Security = "https://github.com/netft/pyNetFT/security/policy"
+
+[tool.scikit-build]
+cmake.version = ">=3.16"
+wheel.packages = ["src/pynetft"]
+sdist.include = [
+  "CHANGELOG.md",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
+  "docs/**",
+]
+sdist.exclude = [
+  "**/__pycache__/**",
+  "**/.pytest_cache/**",
+  "**/*.py[cod]",
+  ".pixi/**",
+  "build/**",
+  "dist/**",
+  "wheelhouse/**",
+]
+sdist.reproducible = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+  "curl_build: builds the pinned curl source archive (opt-in outside wheel CI)",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+packages = ["pynetft"]
+mypy_path = "src"
+
+[tool.cibuildwheel]
+build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*", "cp314-*"]
+skip = ["*-musllinux_*", "*-manylinux_i686", "pp*", "cp*t-*"]
+build-verbosity = 1
+test-command = "python -m pip check && python -m pytest {project}/tests/artifact -q"
+test-requires = ["pytest"]
+
+[tool.cibuildwheel.linux]
+archs = ["x86_64", "aarch64"]
+manylinux-x86_64-image = "manylinux2014"
+manylinux-aarch64-image = "manylinux2014"
+before-all = "bash {project}/tools/build_manylinux_curl.sh"
+environment = { CMAKE_ARGS = "-DCURL_NO_CURL_CMAKE=ON -DCURL_LIBRARY:FILEPATH=/opt/pynetft-curl/lib/libcurl.a -DCURL_INCLUDE_DIR:PATH=/opt/pynetft-curl/include" }
+repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"

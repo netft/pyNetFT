@@ -1,0 +1,16 @@
+coverage:
+  status:
+    project: false
+    patch: false
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+
+flags:
+  python:
+    paths:
+      - src/pynetft/
+  native:
+    paths:
+      - bindings/python/

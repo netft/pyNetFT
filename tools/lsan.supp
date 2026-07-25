@@ -1,0 +1,2 @@
+# pybind11 keeps function records alive for the lifetime of the Python runtime.
+leak:pybind11::cpp_function::make_function_record

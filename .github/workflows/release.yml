@@ -1,0 +1,290 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - name: Validate authorized signed main tag
+        run: |
+          git fetch --no-tags origin \
+            +refs/heads/main:refs/remotes/origin/main
+          git merge-base --is-ancestor \
+            "${GITHUB_REF_NAME}^{commit}" \
+            refs/remotes/origin/main
+          signature_output="$(
+            git \
+              -c gpg.format=ssh \
+              -c gpg.ssh.allowedSignersFile=.github/release-allowed-signers \
+              verify-tag --raw "${GITHUB_REF_NAME}" 2>&1
+          )"
+          printf '%s\n' "${signature_output}"
+          grep -Fq \
+            'Good "git" signature for netft-release with ' \
+            <<<"${signature_output}"
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          cache: false
+      - name: Validate release metadata
+        run: |
+          pixi run python tools/verify_release_tag.py --tag "${GITHUB_REF_NAME}"
+          pixi run python tools/release_metadata.py validate --tag "${GITHUB_REF_NAME}"
+      - name: Verify controlled core snapshot
+        run: pixi run snapshot-check
+      - name: Run complete tests and static analysis
+        run: pixi run check
+      - name: Verify release metadata behavior
+        run: pixi run python -m pytest tests/release -q
+      - name: Build and test release-mode native code
+        run: |
+          pixi run cmake -S . -B build/release-native -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPYNETFT_BUILD_TESTING=ON
+          pixi run cmake --build build/release-native
+          pixi run ctest --test-dir build/release-native --output-on-failure
+      - name: Run native sanitizers
+        run: |
+          pixi run cmake -S . -B build/release-sanitizers -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DPYNETFT_BUILD_TESTING=ON \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -DCMAKE_MODULE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
+          pixi run cmake --build build/release-sanitizers
+          pixi run bash -euo pipefail -c '
+            export LD_PRELOAD="$("${CXX}" -print-file-name=libasan.so)"
+            export PYTHONMALLOC=malloc
+            export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1"
+            export LSAN_OPTIONS="suppressions=${PWD}/tools/lsan.supp:print_suppressions=1"
+            ASAN_OPTIONS="detect_leaks=1:strict_string_checks=1" \
+              ctest --test-dir build/release-sanitizers --output-on-failure
+          '
+
+  wheels:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+            artifact: release-wheels-x86_64
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            artifact: release-wheels-aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install wheel build and validation tools
+        run: python -m pip install cibuildwheel==3.4.1 auditwheel twine pyelftools
+      - name: Build and install-test every supported wheel
+        run: python -m cibuildwheel --platform linux --output-dir wheelhouse
+        env:
+          CIBW_ARCHS_LINUX: ${{ matrix.arch }}
+      - name: Validate every wheel
+        run: |
+          python -m twine check wheelhouse/*.whl
+          python tools/check_wheel.py --self-contained --auditwheel wheelhouse/*.whl
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ matrix.artifact }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  sdist:
+    needs: validate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          cache: false
+      - name: Build and validate sdist
+        run: |
+          pixi run python -m build --sdist --no-isolation --outdir dist
+          pixi run python -m twine check dist/*.tar.gz
+          pixi run python tools/check_sdist.py dist/*.tar.gz
+      - name: Install-test sdist
+        run: |
+          pixi run python -m pip install --force-reinstall --no-build-isolation dist/*.tar.gz
+          pixi run python -m pytest tests/artifact -q
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  assemble:
+    needs: [wheels, sdist]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.14"
+          cache: pip
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: release-wheels-*
+          path: artifacts
+          merge-multiple: true
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: release-sdist
+          path: artifacts
+      - name: Install aggregate validation and source-build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes build-essential libcurl4-openssl-dev
+          python -m pip install auditwheel twine pyelftools
+      - name: Validate complete release artifact inventory
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          python tools/check_release_artifacts.py artifacts --version "${VERSION}"
+          python -m twine check artifacts/*
+          python tools/check_wheel.py --self-contained --auditwheel artifacts/*.whl
+          python tools/check_sdist.py artifacts/*.tar.gz
+          for wheel in artifacts/*.whl; do
+            auditwheel show "${wheel}"
+          done
+      - name: Clean-install current-platform wheel and sdist
+        run: |
+          matching_wheel=(artifacts/*-cp314-cp314-*x86_64.whl)
+          test "${#matching_wheel[@]}" -eq 1
+          python -m venv /tmp/pynetft-wheel-test
+          /tmp/pynetft-wheel-test/bin/python -m pip install "${matching_wheel[0]}" pytest
+          /tmp/pynetft-wheel-test/bin/python -m pytest tests/artifact -q
+          python -m venv /tmp/pynetft-sdist-test
+          env CC=gcc CXX=g++ \
+            /tmp/pynetft-sdist-test/bin/python -m pip install artifacts/*.tar.gz pytest
+          /tmp/pynetft-sdist-test/bin/python -m pytest tests/artifact -q
+      - name: Generate release checksums and notes
+        run: |
+          mkdir -p release/dist release/metadata
+          cp artifacts/*.whl artifacts/*.tar.gz release/dist/
+          (
+            cd release/dist
+            sha256sum * > ../metadata/SHA256SUMS
+          )
+          python tools/release_metadata.py notes \
+            --tag "${GITHUB_REF_NAME}" \
+            --output release/metadata/RELEASE_NOTES.md
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-bundle
+          path: release/
+          if-no-files-found: error
+
+  attest:
+    needs: assemble
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: release-bundle
+          path: release
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: release/dist/*
+
+  draft-release:
+    needs: [assemble, attest]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: release-bundle
+          path: release
+      - name: Create or update draft GitHub Release
+        run: |
+          set -euo pipefail
+          if release_state="$(
+            gh release view "${GITHUB_REF_NAME}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --json isDraft \
+              --jq .isDraft 2>/dev/null
+          )"; then
+            test "${release_state}" = true
+            gh release edit "${GITHUB_REF_NAME}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft \
+              --title "pyNetFT ${GITHUB_REF_NAME#v}" \
+              --notes-file release/metadata/RELEASE_NOTES.md
+            gh release upload "${GITHUB_REF_NAME}" \
+              release/dist/* \
+              release/metadata/SHA256SUMS \
+              --repo "${GITHUB_REPOSITORY}" \
+              --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              release/dist/* \
+              release/metadata/SHA256SUMS \
+              --repo "${GITHUB_REPOSITORY}" \
+              --verify-tag \
+              --draft \
+              --title "pyNetFT ${GITHUB_REF_NAME#v}" \
+              --notes-file release/metadata/RELEASE_NOTES.md
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  publish-pypi:
+    needs: [assemble, draft-release]
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: release-bundle
+          path: release
+      - uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # release/v1
+        with:
+          packages-dir: release/dist/
+          print-hash: true
+
+  finalize-release:
+    needs: [draft-release, publish-pypi]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the verified draft GitHub Release
+        run: >-
+          gh release edit "${GITHUB_REF_NAME}"
+          --repo "${GITHUB_REPOSITORY}"
+          --draft=false
+        env:
+          GH_TOKEN: ${{ github.token }}

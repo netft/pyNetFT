@@ -1,0 +1,77 @@
+name: Hardware compatibility report
+description: Report verified behavior with a specific Net F/T sensor configuration
+title: "[Hardware]: "
+body:
+  - type: markdown
+    attributes:
+      value: Do not include sensor addresses, host addresses, credentials, or other private network details.
+  - type: input
+    id: sensor
+    attributes:
+      label: Sensor model
+      placeholder: ATI Net F/T model
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware or configuration version
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: pyNetFT version
+      placeholder: 2.0.0
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: CPython 3.12.4
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation source
+      options:
+        - PyPI
+        - Downloaded wheel
+        - Source archive
+        - Git checkout or editable install
+        - Linux distribution package
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Host and wheel platform
+      description: Include the OS, architecture, and wheel platform tag or compiler. Do not include network details.
+      placeholder: Linux aarch64, manylinux2014_aarch64
+    validations:
+      required: true
+  - type: textarea
+    id: units
+    attributes:
+      label: Discovered calibration and units
+      description: Include the sensor-reported force unit, torque unit, and counts-per-unit values.
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Results
+      description: Describe discovery, streaming, reconnect, status, and any explicitly requested bias behavior tested.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: Hardware testing was explicitly opted into and supervised, and the sensor was unloaded before any bias command.
+          required: true
+        - label: Credentials, sensor addresses, host addresses, and private network details have been removed.
+          required: true

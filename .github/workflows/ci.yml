@@ -1,0 +1,189 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python ${{ matrix.python-version }} tests
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install native build dependencies
+        run: sudo apt-get update && sudo apt-get install --yes ninja-build libcurl4-openssl-dev
+      - name: Install package and test dependencies
+        run: python -m pip install . pytest
+      - name: Run Python and fake-sensor integration tests
+        run: python -m pytest -q tests/python tests/integration
+
+  quality:
+    name: Format, static analysis, snapshot, and metadata
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@v0.10.0
+        with:
+          cache: true
+      - name: Verify controlled core snapshot
+        run: pixi run snapshot-check
+      - name: Check Python and C++ formatting
+        run: pixi run format-check
+      - name: Lint Python
+        run: pixi run lint
+      - name: Type-check package
+        run: pixi run type-check
+      - name: Analyze native bindings
+        run: pixi run native-tidy
+      - name: Install package for metadata checks
+        run: pixi run install
+      - name: Verify Conda executable dependencies
+        run: pixi run patchelf --version
+      - name: Verify wheel build frontend
+        run: pixi run python -m cibuildwheel --help
+      - name: Verify installed project metadata
+        run: |
+          pixi run python - <<'PY'
+          from importlib.metadata import metadata, version
+
+          project = metadata("pynetft")
+          assert project["Name"] == "pynetft"
+          assert version("pynetft") == "2.0.0"
+          assert project["Requires-Python"] == ">=3.10"
+          PY
+
+  native:
+    name: Native ${{ matrix.build-type }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        build-type: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@v0.10.0
+        with:
+          cache: true
+      - name: Configure
+        run: >-
+          pixi run cmake -S . -B build/native -G Ninja
+          -DCMAKE_BUILD_TYPE=${{ matrix.build-type }}
+          -DPYNETFT_BUILD_TESTING=ON
+      - name: Build
+        run: pixi run cmake --build build/native
+      - name: Test native queue and extension integration
+        run: pixi run ctest --test-dir build/native --output-on-failure
+
+  cmake-316:
+    name: CMake 3.16 core ${{ matrix.library }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - library: shared
+            build-shared: "ON"
+          - library: static
+            build-shared: "OFF"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@v0.10.0
+        with:
+          cache: true
+      - name: Verify pinned CMake version
+        run: pixi run -e cmake-316 cmake --version | grep -E '^cmake version 3\.16\.'
+      - name: Configure core
+        run: >-
+          pixi run -e cmake-316 cmake -S core -B build/cmake-316 -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_SHARED_LIBS=${{ matrix.build-shared }}
+          -DBUILD_TESTING=OFF
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build/cmake-316-install
+      - name: Build and install core
+        run: |
+          pixi run -e cmake-316 cmake --build build/cmake-316
+          pixi run -e cmake-316 cmake --install build/cmake-316
+
+  sanitizers:
+    name: Native ASan and UBSan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@v0.10.0
+        with:
+          cache: true
+      - name: Configure
+        run: >-
+          pixi run cmake -S . -B build/sanitizers -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DPYNETFT_BUILD_TESTING=ON
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+          -DCMAKE_MODULE_LINKER_FLAGS="-fsanitize=address,undefined"
+          -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
+      - name: Build
+        run: pixi run cmake --build build/sanitizers
+      - name: Test native queue and extension integration
+        run: |
+          pixi run bash -euo pipefail -c '
+            export LD_PRELOAD="$("${CXX}" -print-file-name=libasan.so)"
+            export PYTHONMALLOC=malloc
+            export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1"
+            export LSAN_OPTIONS="suppressions=${PWD}/tools/lsan.supp:print_suppressions=1"
+            ASAN_OPTIONS="detect_leaks=1:strict_string_checks=1" \
+              ctest --test-dir build/sanitizers --output-on-failure \
+              --tests-regex "^(sample_queue|native_client)$"
+            ASAN_OPTIONS="detect_leaks=1:strict_string_checks=1" \
+              ctest --test-dir build/sanitizers --output-on-failure \
+              --tests-regex "^exception_locality$"
+          '
+
+  arm64:
+    name: ARM64 Release
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@v0.10.0
+        with:
+          cache: true
+      - name: Configure
+        run: >-
+          pixi run cmake -S . -B build/arm64 -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DPYNETFT_BUILD_TESTING=ON
+      - name: Build
+        run: pixi run cmake --build build/arm64
+      - name: Test native queue and extension integration
+        run: pixi run ctest --test-dir build/arm64 --output-on-failure
+      - name: Install package
+        run: pixi run install
+      - name: Run Python and fake-sensor integration tests
+        run: pixi run python -m pytest -q

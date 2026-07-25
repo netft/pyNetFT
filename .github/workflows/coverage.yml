@@ -1,0 +1,43 @@
+name: Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@v0.10.0
+        with:
+          cache: true
+      - name: Generate Python and native coverage
+        run: pixi run coverage
+      - name: Upload Python coverage
+        uses: codecov/codecov-action@v7
+        continue-on-error: true
+        with:
+          files: coverage.xml
+          disable_search: true
+          flags: python
+          use_oidc: true
+      - name: Upload native coverage
+        uses: codecov/codecov-action@v7
+        continue-on-error: true
+        with:
+          files: coverage-native.xml
+          disable_search: true
+          flags: native
+          use_oidc: true

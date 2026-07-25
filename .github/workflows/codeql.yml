@@ -1,0 +1,57 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "23 4 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze ${{ matrix.language }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            build-mode: none
+            suppression-pack: ""
+          - language: c-cpp
+            build-mode: manual
+            suppression-pack: +codeql/cpp-queries:AlertSuppression.ql
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Initialize Python CodeQL
+        if: matrix.language == 'python'
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+      - name: Initialize C++ CodeQL with inline suppressions
+        if: matrix.language == 'c-cpp'
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          packs: ${{ matrix.suppression-pack }}
+      - uses: prefix-dev/setup-pixi@v0.10.0
+        if: matrix.language == 'c-cpp'
+        with:
+          cache: true
+      - name: Build extension for C++ analysis
+        if: matrix.language == 'c-cpp'
+        run: pixi run install
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4

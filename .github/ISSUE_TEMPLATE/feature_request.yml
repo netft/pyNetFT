@@ -1,0 +1,47 @@
+name: Feature request
+description: Propose a focused improvement to pyNetFT
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What Python user or integration problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the API, packaging, or workflow you would expect.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility impact
+      description: Note supported Python versions, wheel platforms, legacy API behavior, or ros-netft backport implications.
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware context
+      description: Optional. If the proposal is hardware-specific, provide the sensor model and firmware or configuration version. Do not include any network address.
+    validations:
+      required: false
+  - type: checkboxes
+    id: hardware-opt-in
+    attributes:
+      label: Hardware testing
+      options:
+        - label: I understand that hardware testing is opt-in, must be supervised, and must not bias a loaded sensor.
+          required: true

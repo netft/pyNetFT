@@ -1,0 +1,59 @@
+[workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64", "linux-aarch64"]
+
+[dependencies]
+python = ">=3.10,<3.15"
+cmake = ">=3.16"
+ninja = "*"
+cxx-compiler = "*"
+libcurl = ">=7.63.0"
+pybind11 = ">=2.13,<3"
+scikit-build-core = ">=0.11,<1"
+pip = "*"
+pytest = "*"
+pytest-repeat = "*"
+pytest-cov = "*"
+pyyaml = "*"
+gtest = "*"
+ruff = "*"
+mypy = "*"
+clang-format = "*"
+clang-tools = "*"
+gcovr = "*"
+python-build = "*"
+twine = "*"
+auditwheel = "*"
+make = "*"
+
+[target.linux-64.dependencies]
+cibuildwheel = "==3.4.1"
+
+[feature.cmake-316.dependencies]
+cmake = "3.16.*"
+
+[environments]
+cmake-316 = ["cmake-316"]
+
+[tasks]
+install = "python -m pip install --no-build-isolation -e ."
+test = { cmd = "python -m pytest -q", depends-on = ["install"] }
+snapshot-check = "python tools/sync_core.py verify"
+format = "ruff format . && clang-format -i bindings/python/*.cpp bindings/python/*.hpp tests/native/*.cpp"
+format-check = "ruff format --check . && clang-format --dry-run --Werror bindings/python/*.cpp bindings/python/*.hpp tests/native/*.cpp"
+lint = "ruff check ."
+type-check = "mypy"
+native-tidy = "cmake -S . -B build/native-tidy -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DPYNETFT_BUILD_TESTING=ON && cmake --build build/native-tidy && clang-tidy -p build/native-tidy --checks='clang-analyzer-*,bugprone-*,performance-*' --header-filter='^.*/(bindings/python|tests/native)/' --warnings-as-errors='*' bindings/python/*.cpp tests/native/*.cpp"
+coverage = { cmd = "python -m pytest -q --cov=pynetft --cov-report=term-missing --cov-report=xml:coverage.xml && cmake -S . -B build/native-coverage -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPYNETFT_BUILD_TESTING=ON -DCMAKE_CXX_FLAGS=--coverage -DCMAKE_EXE_LINKER_FLAGS=--coverage -DCMAKE_MODULE_LINKER_FLAGS=--coverage && cmake --build build/native-coverage && ctest --test-dir build/native-coverage --output-on-failure && gcovr --root . --filter bindings/python/ --xml-pretty --output coverage-native.xml build/native-coverage", depends-on = ["install"] }
+check = { depends-on = [
+  "snapshot-check",
+  "test",
+  "format-check",
+  "lint",
+  "type-check",
+  "native-tidy",
+] }
+wheel = "python -m build --sdist --wheel --no-isolation"
+wheel-check = "python tools/check_wheel.py dist/pynetft-2.0.0-*.whl"
+sdist-check = "python tools/check_sdist.py dist/pynetft-2.0.0.tar.gz"
+hardware-test = "python tools/hardware_test.py"

@@ -1,0 +1,91 @@
+name: Bug report
+description: Report reproducible incorrect behavior in pyNetFT
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve pyNetFT. Do not include credentials, sensor addresses, host addresses, or private data.
+  - type: input
+    id: version
+    attributes:
+      label: pyNetFT version
+      description: Release, tag, or commit that shows the problem.
+      placeholder: 2.0.0
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: CPython 3.12.4
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation source
+      options:
+        - PyPI
+        - Downloaded wheel
+        - Source archive
+        - Git checkout or editable install
+        - Linux distribution package
+    validations:
+      required: true
+  - type: input
+    id: wheel-platform
+    attributes:
+      label: Wheel platform or source-build environment
+      description: Include the wheel platform tag, or the OS, architecture, and compiler used for a source build.
+      placeholder: manylinux2014_x86_64
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Client lifecycle or streaming
+        - Discovery and calibration
+        - Callback delivery
+        - Legacy API
+        - Build or installation
+        - Tests or automation
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware information
+      description: Optional. If hardware was used, provide the sensor model and firmware or configuration version. Do not include any network address.
+    validations:
+      required: false
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest safe sequence that reproduces the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and logs
+      description: Remove credentials, network addresses, and sensitive payloads.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: No hardware was used, or hardware testing was explicitly opted into, supervised, and did not expose people or equipment to unsafe loads.
+          required: true

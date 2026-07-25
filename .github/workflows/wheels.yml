@@ -1,0 +1,104 @@
+name: Wheels
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  curl-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install curl build test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes build-essential curl xz-utils
+          python -m pip install pytest
+      - name: Build and inspect the pinned curl dependency
+        run: python -m pytest tests/packaging/test_manylinux_curl.py -q
+        env:
+          PYNETFT_RUN_CURL_BUILD_TEST: "1"
+
+  smoke:
+    if: github.event_name == 'pull_request'
+    needs: curl-build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install wheel build frontend
+        run: python -m pip install cibuildwheel==3.4.1 auditwheel
+      - name: Build CPython 3.10 x86_64 wheel
+        run: python -m cibuildwheel --platform linux --output-dir wheelhouse
+        env:
+          CIBW_BUILD: cp310-*
+          CIBW_ARCHS_LINUX: x86_64
+      - name: Validate wheel structure and dependencies
+        run: >-
+          python tools/check_wheel.py
+          --self-contained
+          --auditwheel
+          wheelhouse/*.whl
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheels-smoke-x86_64
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  wheels:
+    if: github.event_name != 'pull_request'
+    needs: curl-build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install wheel build frontend
+        run: python -m pip install cibuildwheel==3.4.1 auditwheel
+      - name: Build supported wheels
+        run: python -m cibuildwheel --platform linux --output-dir wheelhouse
+        env:
+          CIBW_ARCHS_LINUX: ${{ matrix.arch }}
+      - name: Validate wheel structure and dependencies
+        run: >-
+          python tools/check_wheel.py
+          --self-contained
+          --auditwheel
+          wheelhouse/*.whl
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheels-${{ matrix.arch }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
