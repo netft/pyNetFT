@@ -47,6 +47,18 @@ def _write_complete_inventory(root: Path) -> list[str]:
     return wheel_names
 
 
+def _write_complete_auditwheel_inventory(root: Path) -> None:
+    for python in ("cp310", "cp311", "cp312", "cp313", "cp314"):
+        for platform in (
+            "manylinux2014_x86_64.manylinux_2_17_x86_64",
+            "manylinux2014_aarch64.manylinux_2_17_aarch64",
+            "macosx_11_0_x86_64",
+            "macosx_11_0_arm64",
+        ):
+            (root / f"pynetft-2.0.1-{python}-{python}-{platform}.whl").touch()
+    (root / "pynetft-2.0.1.tar.gz").touch()
+
+
 def _git(repository: Path, *arguments: str, input_text: str | None = None) -> str:
     return subprocess.run(
         ["git", "-C", str(repository), *arguments],
@@ -421,6 +433,15 @@ def test_release_artifact_inventory_rejects_missing_or_duplicate_matrix_entries(
         tool.validate_inventory(tmp_path, "2.0.1")
 
 
+def test_release_artifact_inventory_accepts_auditwheel_platform_tag_order(
+    tmp_path: Path,
+) -> None:
+    tool = _load_tool("check_release_artifacts")
+    _write_complete_auditwheel_inventory(tmp_path)
+
+    tool.validate_inventory(tmp_path, "2.0.1")
+
+
 @pytest.mark.parametrize(
     ("original_platform", "replacement"),
     (
@@ -435,6 +456,19 @@ def test_release_artifact_inventory_rejects_missing_or_duplicate_matrix_entries(
         (
             "manylinux_2_17_x86_64.manylinux2014_x86_64",
             "pynetft-2.0.1-cp310-cp310-linux_x86_64.whl",
+        ),
+        (
+            "manylinux_2_17_x86_64.manylinux2014_x86_64",
+            "pynetft-2.0.1-cp310-cp310-manylinux2014_x86_64.whl",
+        ),
+        (
+            "manylinux_2_17_x86_64.manylinux2014_x86_64",
+            "pynetft-2.0.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.linux_x86_64.whl",
+        ),
+        (
+            "manylinux_2_17_x86_64.manylinux2014_x86_64",
+            "pynetft-2.0.1-cp310-cp310-manylinux_2_17_x86_64."
+            "manylinux2014_x86_64.manylinux2014_x86_64.whl",
         ),
         (
             "manylinux_2_17_x86_64.manylinux2014_x86_64",

@@ -14,11 +14,17 @@ _PLATFORM_ARCHITECTURES = frozenset(
         ("macosx_11_0", "arm64"),
     }
 )
-_PLATFORM_TAGS = {
-    "manylinux_2_17_x86_64.manylinux2014_x86_64": ("manylinux2014", "x86_64"),
-    "manylinux_2_17_aarch64.manylinux2014_aarch64": ("manylinux2014", "aarch64"),
-    "macosx_11_0_x86_64": ("macosx_11_0", "x86_64"),
-    "macosx_11_0_arm64": ("macosx_11_0", "arm64"),
+_PLATFORM_COMPONENTS = {
+    tuple(sorted(("manylinux_2_17_x86_64", "manylinux2014_x86_64"))): (
+        "manylinux2014",
+        "x86_64",
+    ),
+    tuple(sorted(("manylinux_2_17_aarch64", "manylinux2014_aarch64"))): (
+        "manylinux2014",
+        "aarch64",
+    ),
+    ("macosx_11_0_x86_64",): ("macosx_11_0", "x86_64"),
+    ("macosx_11_0_arm64",): ("macosx_11_0", "arm64"),
 }
 _WHEEL_FILENAME = re.compile(
     r"^pynetft-(?P<version>[^-]+)-(?P<python>cp\d+)-(?P<abi>cp\d+)-"
@@ -52,8 +58,9 @@ def validate_inventory(root: Path, version: str) -> None:
         if python != match.group("abi"):
             raise ReleaseArtifactError("wheel_abi")
         platform = match.group("platform")
+        platform_components = tuple(sorted(platform.split(".")))
         try:
-            platform_name, architecture = _PLATFORM_TAGS[platform]
+            platform_name, architecture = _PLATFORM_COMPONENTS[platform_components]
         except KeyError:
             raise ReleaseArtifactError("wheel_platform") from None
         entry = (python, platform_name, architecture)
