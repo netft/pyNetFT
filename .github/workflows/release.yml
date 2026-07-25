@@ -110,6 +110,43 @@ jobs:
           path: wheelhouse/*.whl
           if-no-files-found: error
 
+  macos-wheels:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: macos-15-intel
+            artifact: release-wheels-macos-x86_64
+          - arch: arm64
+            runner: macos-15
+            artifact: release-wheels-macos-arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install wheel build and validation tools
+        run: python -m pip install cibuildwheel==3.4.1 delocate twine
+      - name: Build and install-test every supported wheel
+        run: python -m cibuildwheel --platform macos --output-dir wheelhouse
+        env:
+          CIBW_ARCHS_MACOS: ${{ matrix.arch }}
+      - name: Validate every wheel
+        run: |
+          python -m twine check wheelhouse/*.whl
+          python tools/check_wheel.py --self-contained --delocate wheelhouse/*.whl
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ matrix.artifact }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
   sdist:
     needs: validate
     runs-on: ubuntu-24.04
@@ -136,7 +173,7 @@ jobs:
           if-no-files-found: error
 
   assemble:
-    needs: [wheels, sdist]
+    needs: [wheels, macos-wheels, sdist]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -165,14 +202,13 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           python tools/check_release_artifacts.py artifacts --version "${VERSION}"
           python -m twine check artifacts/*
-          python tools/check_wheel.py --self-contained --auditwheel artifacts/*.whl
+          python tools/check_wheel.py artifacts/*.whl
           python tools/check_sdist.py artifacts/*.tar.gz
-          for wheel in artifacts/*.whl; do
-            auditwheel show "${wheel}"
-          done
+          linux_wheels=(artifacts/*-manylinux*.whl)
+          python tools/check_wheel.py --self-contained --auditwheel "${linux_wheels[@]}"
       - name: Clean-install current-platform wheel and sdist
         run: |
-          matching_wheel=(artifacts/*-cp314-cp314-*x86_64.whl)
+          matching_wheel=(artifacts/*-cp314-cp314-*manylinux*x86_64.whl)
           test "${#matching_wheel[@]}" -eq 1
           python -m venv /tmp/pynetft-wheel-test
           /tmp/pynetft-wheel-test/bin/python -m pip install "${matching_wheel[0]}" pytest

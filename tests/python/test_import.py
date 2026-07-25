@@ -5,7 +5,7 @@ from pynetft import _native
 
 
 def test_installed_version_and_native_module_agree() -> None:
-    assert pynetft.__version__ == "2.0.0"
+    assert pynetft.__version__ == "2.0.1"
     assert version("pynetft") == pynetft.__version__
     assert _native.__version__ == pynetft.__version__
 

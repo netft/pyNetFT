@@ -1,6 +1,6 @@
 [workspace]
 channels = ["conda-forge"]
-platforms = ["linux-64", "linux-aarch64"]
+platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64"]
 
 [dependencies]
 python = ">=3.10,<3.15"
@@ -23,11 +23,25 @@ clang-tools = "*"
 gcovr = "*"
 python-build = "*"
 twine = "*"
-auditwheel = "*"
 make = "*"
 
 [target.linux-64.dependencies]
 cibuildwheel = "==3.4.1"
+auditwheel = "*"
+
+[target.linux-aarch64.dependencies]
+auditwheel = "*"
+
+[target.osx-64.dependencies]
+cibuildwheel = "==3.4.1"
+delocate = "*"
+
+[target.osx-arm64.dependencies]
+cibuildwheel = "==3.4.1"
+delocate = "*"
+
+[feature.cmake-316]
+platforms = ["linux-64", "linux-aarch64"]
 
 [feature.cmake-316.dependencies]
 cmake = "3.16.*"
@@ -54,6 +68,6 @@ check = { depends-on = [
   "native-tidy",
 ] }
 wheel = "python -m build --sdist --wheel --no-isolation"
-wheel-check = "python tools/check_wheel.py dist/pynetft-2.0.0-*.whl"
-sdist-check = "python tools/check_sdist.py dist/pynetft-2.0.0.tar.gz"
+wheel-check = "python tools/check_wheel.py dist/pynetft-2.0.1-*.whl"
+sdist-check = "python tools/check_sdist.py dist/pynetft-2.0.1.tar.gz"
 hardware-test = "python tools/hardware_test.py"

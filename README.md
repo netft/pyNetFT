@@ -12,27 +12,26 @@ pyNetFT is a synchronous, typed Python client for ATI Industrial Automation Net 
 
 - **Tested native core:** the protocol and recovery implementation is pinned to [netft-cpp 0.2.2](https://github.com/netft/netft-cpp/releases/tag/v0.2.2), includes its GCC 10/manylinux2014 compatibility fix and corrected libcurl minimum, and is exercised with offline fake sensors and native sanitizers.
 - **Sensor-aware data:** calibration, force and torque units, configuration revisions, sequence progress, and faults remain visible to the application.
-- **Self-contained typed wheels:** Linux wheels include the native core and a minimal static HTTP-only curl build, plus inline type information for Python 3.10–3.14.
+- **Self-contained typed wheels:** Linux and macOS wheels include the native core and a minimal static HTTP-only curl build, plus inline type information for Python 3.10–3.14.
 
 ## Supported platforms
 
-| Installation | Python | Platform | Architecture | Support |
-| --- | --- | --- | --- | --- |
-| PyPI wheel | CPython 3.10–3.14 | manylinux2014 or newer Linux | x86_64 | Supported |
-| PyPI wheel | CPython 3.10–3.14 | manylinux2014 or newer Linux | AArch64 | Supported |
-| Source build | CPython 3.10–3.14 | POSIX | Host compiler architecture | Best effort |
+| Install method | Platform | Support |
+| --- | --- | --- |
+| PyPI | Linux and macOS (x86_64 and ARM64), CPython 3.10–3.14 | Supported |
+| Source | Linux, macOS, and other POSIX systems, CPython 3.10–3.14 | Best effort |
 
-Windows, macOS wheels, PyPy, and asyncio are not supported by the 2.x package.
+Windows, PyPy, and asyncio are not supported by the 2.x package.
 
 ## Installation
 
-Install a supported wheel from PyPI:
+Install a supported wheel from PyPI; it includes curl, so no separately installed curl is needed:
 
 ```bash
 python -m pip install pynetft
 ```
 
-For a source build, use a C++17 compiler, CMake 3.16 or newer, and libcurl 7.63.0 or newer:
+For a source build, use a C++17 compiler, CMake 3.16 or newer, and system libcurl 7.63.0 or newer:
 
 ```bash
 git clone https://github.com/netft/pyNetFT.git

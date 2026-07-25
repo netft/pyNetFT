@@ -3,10 +3,12 @@ from __future__ import annotations
 from enum import Enum
 from operator import index
 from pathlib import Path
+from re import search
 from subprocess import run
 from sys import executable
 
 import pytest
+import tomllib
 import yaml
 from mypy import api as mypy_api
 
@@ -216,6 +218,78 @@ def test_quality_environment_checks_conda_executable_dependencies() -> None:
     assert "pixi run patchelf --version" in commands
     assert "pixi run python -m cibuildwheel --help" in commands
     assert "pixi run python -m pip check" not in commands
+
+
+def test_pixi_workspace_resolves_native_linux_and_macos_platforms() -> None:
+    with (ROOT / "pixi.toml").open("rb") as stream:
+        manifest = tomllib.load(stream)
+
+    assert set(manifest["workspace"]["platforms"]) == {
+        "linux-64",
+        "linux-aarch64",
+        "osx-64",
+        "osx-arm64",
+    }
+
+
+def test_macos_pixi_targets_provide_native_wheel_repair_tools() -> None:
+    with (ROOT / "pixi.toml").open("rb") as stream:
+        manifest = tomllib.load(stream)
+
+    default_dependencies = manifest["dependencies"]
+    target_dependencies = manifest["target"]
+
+    assert "auditwheel" not in default_dependencies
+    for platform in ("linux-64", "linux-aarch64"):
+        assert "auditwheel" in target_dependencies[platform]["dependencies"]
+    for platform in ("osx-64", "osx-arm64"):
+        dependencies = target_dependencies[platform]["dependencies"]
+        assert dependencies["cibuildwheel"] == "==3.4.1"
+        assert "delocate" in dependencies
+        assert "auditwheel" not in dependencies
+
+
+def test_macos_ci_runs_native_and_fake_sensor_tests_on_both_architectures() -> None:
+    with (ROOT / ".github/workflows/ci.yml").open(encoding="utf-8") as stream:
+        workflow = yaml.safe_load(stream)
+    macos = workflow["jobs"]["macos"]
+    matrix = macos["strategy"]["matrix"]
+    commands = [step["run"] for step in macos["steps"] if isinstance(step.get("run"), str)]
+
+    assert macos["runs-on"] == "${{ matrix.runner }}"
+    assert macos["strategy"]["fail-fast"] is False
+    assert {(entry["runner"], entry["arch"]) for entry in matrix["include"]} == {
+        ("macos-15-intel", "x86_64"),
+        ("macos-15", "arm64"),
+    }
+    assert any(
+        step.get("uses") == "prefix-dev/setup-pixi@v0.10.0"
+        and step.get("with", {}).get("cache") is True
+        for step in macos["steps"]
+    )
+    assert any(
+        "cmake -S . -B build/macos" in command
+        and "-DCMAKE_BUILD_TYPE=Release" in command
+        and "-DPYNETFT_BUILD_TESTING=ON" in command
+        for command in commands
+    )
+    assert any("cmake --build build/macos" in command for command in commands)
+    assert any(
+        "ctest --test-dir build/macos --output-on-failure" in command for command in commands
+    )
+    assert "pixi run install" in commands
+    assert "pixi run python -m pytest -q tests/python tests/integration" in commands
+
+
+def test_macos_ci_never_targets_a_hardware_sensor() -> None:
+    with (ROOT / ".github/workflows/ci.yml").open(encoding="utf-8") as stream:
+        workflow = yaml.safe_load(stream)
+    serialized_job = yaml.safe_dump(workflow["jobs"]["macos"])
+
+    assert "hardware-test" not in serialized_job
+    assert "hardware_test.py" not in serialized_job
+    assert "NETFT_SENSOR" not in serialized_job
+    assert search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", serialized_job) is None
 
 
 def test_python_matrix_collection_does_not_require_quality_dependencies() -> None:

@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## 2.0.1 - 2026-07-25
+
+### Added
+
+- Publish self-contained CPython 3.10–3.14 wheels for macOS 11 or newer on
+  Intel and Apple Silicon.
+
+### Changed
+
+- Share the pinned static HTTP-only curl 8.21.0 build across Linux and macOS
+  wheel production without requiring a user-installed curl.
+
 ## 2.0.0 - 2026-07-24
 
 ### Added

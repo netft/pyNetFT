@@ -7,7 +7,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynetft"
-version = "2.0.0"
+version = "2.0.1"
 description = "Python client for ATI Net F/T Ethernet force/torque sensors"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -87,5 +87,11 @@ archs = ["x86_64", "aarch64"]
 manylinux-x86_64-image = "manylinux2014"
 manylinux-aarch64-image = "manylinux2014"
 before-all = "bash {project}/tools/build_manylinux_curl.sh"
-environment = { CMAKE_ARGS = "-DCURL_NO_CURL_CMAKE=ON -DCURL_LIBRARY:FILEPATH=/opt/pynetft-curl/lib/libcurl.a -DCURL_INCLUDE_DIR:PATH=/opt/pynetft-curl/include" }
+environment = { CMAKE_ARGS = "-DCURL_NO_CURL_CMAKE=ON -DCURL_USE_STATIC_LIBS=ON -DCURL_LIBRARY:FILEPATH=/opt/pynetft-curl/lib/libcurl.a -DCURL_INCLUDE_DIR:PATH=/opt/pynetft-curl/include" }
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.macos]
+archs = ["x86_64", "arm64"]
+before-all = "bash {project}/tools/build_macos_curl.sh"
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0", PYNETFT_CURL_PREFIX = "$RUNNER_TEMP/pynetft-curl", CMAKE_ARGS = "-DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON -DCURL_NO_CURL_CMAKE=ON -DCURL_USE_STATIC_LIBS=ON -DCURL_LIBRARY:FILEPATH=$RUNNER_TEMP/pynetft-curl/lib/libcurl.a -DCURL_INCLUDE_DIR:PATH=$RUNNER_TEMP/pynetft-curl/include" }
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} {wheel}"

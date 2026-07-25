@@ -6,7 +6,24 @@ import re
 from pathlib import Path
 
 _PYTHON_TAGS = ("cp310", "cp311", "cp312", "cp313", "cp314")
-_ARCHITECTURES = ("x86_64", "aarch64")
+_PLATFORM_ARCHITECTURES = frozenset(
+    {
+        ("manylinux2014", "x86_64"),
+        ("manylinux2014", "aarch64"),
+        ("macosx_11_0", "x86_64"),
+        ("macosx_11_0", "arm64"),
+    }
+)
+_PLATFORM_TAGS = {
+    "manylinux_2_17_x86_64.manylinux2014_x86_64": ("manylinux2014", "x86_64"),
+    "manylinux_2_17_aarch64.manylinux2014_aarch64": ("manylinux2014", "aarch64"),
+    "macosx_11_0_x86_64": ("macosx_11_0", "x86_64"),
+    "macosx_11_0_arm64": ("macosx_11_0", "arm64"),
+}
+_WHEEL_FILENAME = re.compile(
+    r"^pynetft-(?P<version>[^-]+)-(?P<python>cp\d+)-(?P<abi>cp\d+)-"
+    r"(?P<platform>.+)\.whl$"
+)
 
 
 class ReleaseArtifactError(RuntimeError):
@@ -20,30 +37,26 @@ def validate_inventory(root: Path, version: str) -> None:
         raise ReleaseArtifactError("sdist_inventory")
 
     expected = {
-        (python, architecture) for python in _PYTHON_TAGS for architecture in _ARCHITECTURES
+        (python, platform, architecture)
+        for python in _PYTHON_TAGS
+        for platform, architecture in _PLATFORM_ARCHITECTURES
     }
-    actual: set[tuple[str, str]] = set()
-    prefix = re.compile(
-        rf"^pynetft-{re.escape(version)}-"
-        r"(?P<python>cp3(?:10|11|12|13|14))-(?P=python)-(?P<platform>.+)\.whl$"
-    )
+    actual: set[tuple[str, str, str]] = set()
     for wheel in wheels:
-        match = prefix.match(wheel.name)
+        match = _WHEEL_FILENAME.match(wheel.name)
         if match is None:
             raise ReleaseArtifactError("wheel_filename")
+        if match.group("version") != version:
+            raise ReleaseArtifactError("wheel_version")
         python = match.group("python")
+        if python != match.group("abi"):
+            raise ReleaseArtifactError("wheel_abi")
         platform = match.group("platform")
-        architectures = [
-            architecture
-            for architecture in _ARCHITECTURES
-            if re.search(rf"(?:^|[_.]){re.escape(architecture)}(?:[_.]|$)", platform)
-        ]
-        if len(architectures) != 1:
-            raise ReleaseArtifactError("wheel_architecture")
-        architecture = architectures[0]
-        if re.search(rf"(?:^|\.)manylinux2014_{re.escape(architecture)}(?:\.|$)", platform) is None:
-            raise ReleaseArtifactError("wheel_platform")
-        entry = (python, architecture)
+        try:
+            platform_name, architecture = _PLATFORM_TAGS[platform]
+        except KeyError:
+            raise ReleaseArtifactError("wheel_platform") from None
+        entry = (python, platform_name, architecture)
         if entry in actual:
             raise ReleaseArtifactError("duplicate_wheel")
         actual.add(entry)

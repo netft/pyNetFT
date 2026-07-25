@@ -68,7 +68,7 @@ jobs:
 
           project = metadata("pynetft")
           assert project["Name"] == "pynetft"
-          assert version("pynetft") == "2.0.0"
+          assert version("pynetft") == "2.0.1"
           assert project["Requires-Python"] == ">=3.10"
           PY
 
@@ -95,6 +95,38 @@ jobs:
         run: pixi run cmake --build build/native
       - name: Test native queue and extension integration
         run: pixi run ctest --test-dir build/native --output-on-failure
+
+  macos:
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            arch: x86_64
+          - runner: macos-15
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@v0.10.0
+        with:
+          cache: true
+      - name: Configure
+        run: >-
+          pixi run cmake -S . -B build/macos -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DPYNETFT_BUILD_TESTING=ON
+      - name: Build
+        run: pixi run cmake --build build/macos
+      - name: Run native tests
+        run: pixi run ctest --test-dir build/macos --output-on-failure
+      - name: Install package
+        run: pixi run install
+      - name: Run Python and fake-sensor integration tests
+        run: pixi run python -m pytest -q tests/python tests/integration
 
   cmake-316:
     name: CMake 3.16 core ${{ matrix.library }}

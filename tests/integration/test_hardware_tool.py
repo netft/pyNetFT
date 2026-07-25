@@ -59,6 +59,7 @@ def test_sampling_window_starts_after_discovery_and_first_sample(
             sensor_host=fake_sensor.host,
             rdt_port=fake_sensor.rdt_port,
             http_port=fake_sensor.http_port,
+            receive_timeout=1.0,
         ),
         duration=0.05,
     )
