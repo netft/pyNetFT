@@ -232,6 +232,24 @@ def test_pixi_workspace_resolves_native_linux_and_macos_platforms() -> None:
     }
 
 
+def test_python_build_backend_matches_pixi_environment() -> None:
+    with (ROOT / "pyproject.toml").open("rb") as stream:
+        project = tomllib.load(stream)
+    with (ROOT / "pixi.toml").open("rb") as stream:
+        pixi = tomllib.load(stream)
+
+    backend_requirement = next(
+        requirement
+        for requirement in project["build-system"]["requires"]
+        if requirement.startswith("scikit-build-core")
+    )
+    assert (
+        backend_requirement.removeprefix("scikit-build-core")
+        == pixi["dependencies"]["scikit-build-core"]
+    )
+    assert project["tool"]["scikit-build"]["minimum-version"] == "build-system.requires"
+
+
 def test_macos_pixi_targets_provide_native_wheel_repair_tools() -> None:
     with (ROOT / "pixi.toml").open("rb") as stream:
         manifest = tomllib.load(stream)

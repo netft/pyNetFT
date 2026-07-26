@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-  "scikit-build-core>=0.11,<1",
+  "scikit-build-core>=1.0.3,<2",
   "pybind11>=2.13,<3",
 ]
 build-backend = "scikit_build_core.build"
@@ -36,6 +36,7 @@ Changelog = "https://github.com/netft/pyNetFT/blob/main/CHANGELOG.md"
 Security = "https://github.com/netft/pyNetFT/security/policy"
 
 [tool.scikit-build]
+minimum-version = "build-system.requires"
 cmake.version = ">=3.16"
 wheel.packages = ["src/pynetft"]
 sdist.include = [
