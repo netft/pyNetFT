@@ -5,7 +5,7 @@
 [![CodeQL](https://github.com/netft/pyNetFT/actions/workflows/codeql.yml/badge.svg)](https://github.com/netft/pyNetFT/actions/workflows/codeql.yml)
 [![Codecov](https://codecov.io/gh/netft/pyNetFT/branch/main/graph/badge.svg)](https://codecov.io/gh/netft/pyNetFT)
 [![PyPI](https://img.shields.io/pypi/v/pynetft.svg)](https://pypi.org/project/pynetft/)
-[![Python](https://img.shields.io/pypi/pyversions/pynetft.svg)](https://pypi.org/project/pynetft/)
+[![Python 3.10–3.14](https://img.shields.io/badge/Python-3.10%E2%80%933.14-blue.svg)](https://pypi.org/project/pynetft/)
 [![License](https://img.shields.io/github/license/netft/pyNetFT.svg)](https://github.com/netft/pyNetFT/blob/main/LICENSE)
 
 pyNetFT is a synchronous, typed Python client for ATI Industrial Automation Net F/T Ethernet force/torque sensors. It discovers the sensor calibration, streams RDT measurements through a native C++ core, and exposes raw counts, physical measurements, health, and recovery information without requiring NumPy.
