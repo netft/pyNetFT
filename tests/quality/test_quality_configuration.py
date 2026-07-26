@@ -238,15 +238,13 @@ def test_python_build_backend_matches_pixi_environment() -> None:
     with (ROOT / "pixi.toml").open("rb") as stream:
         pixi = tomllib.load(stream)
 
-    backend_requirement = next(
-        requirement
-        for requirement in project["build-system"]["requires"]
-        if requirement.startswith("scikit-build-core")
-    )
-    assert (
-        backend_requirement.removeprefix("scikit-build-core")
-        == pixi["dependencies"]["scikit-build-core"]
-    )
+    for dependency in ("scikit-build-core", "pybind11"):
+        backend_requirement = next(
+            requirement
+            for requirement in project["build-system"]["requires"]
+            if requirement.startswith(dependency)
+        )
+        assert backend_requirement.removeprefix(dependency) == pixi["dependencies"][dependency]
     assert project["tool"]["scikit-build"]["minimum-version"] == "build-system.requires"
 
 
