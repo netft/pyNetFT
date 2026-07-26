@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -213,6 +214,17 @@ def test_wheel_workflow_has_smoke_and_full_build_modes() -> None:
     with (ROOT / ".github" / "workflows" / "wheels.yml").open(encoding="utf-8") as stream:
         workflow = yaml.load(stream, Loader=yaml.BaseLoader)
 
+    upload_steps = [
+        step
+        for job in workflow["jobs"].values()
+        for step in job["steps"]
+        if step.get("uses", "").startswith("actions/upload-artifact@")
+    ]
+    assert upload_steps
+    assert all(
+        re.fullmatch(r"actions/upload-artifact@[0-9a-f]{40}", step["uses"]) for step in upload_steps
+    )
+
     assert set(workflow["on"]) == {"pull_request", "push", "workflow_dispatch"}
     assert workflow["on"]["push"]["branches"] == ["main"]
     curl_build = workflow["jobs"]["curl-build"]
@@ -335,7 +347,9 @@ def test_wheel_workflow_has_smoke_and_full_build_modes() -> None:
         )
         assert shlex.split(macos_validation["run"]) == expected_macos_validation
         macos_upload = next(
-            step for step in macos["steps"] if step.get("uses") == "actions/upload-artifact@v6"
+            step
+            for step in macos["steps"]
+            if step.get("uses", "").startswith("actions/upload-artifact@")
         )
         assert macos_upload["with"]["name"] == artifact_name
         assert macos_upload["with"]["path"] == "wheelhouse/*.whl"
