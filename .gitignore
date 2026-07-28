@@ -38,7 +38,8 @@ coverage-native.xml
 *.swp
 .DS_Store
 
-# Local worktrees and secrets
+# Local worktrees, planning files, and secrets
 /.worktrees/
+/.superpowers/
 .env
 .pypirc
