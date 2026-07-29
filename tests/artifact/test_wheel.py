@@ -24,7 +24,7 @@ def test_native_extension_and_type_marker_are_installed() -> None:
     import pynetft
     from pynetft import _native
 
-    assert pynetft.__version__ == "2.0.1"
+    assert pynetft.__version__ == "2.1.0"
     assert _native.__version__ == pynetft.__version__
     assert resources.files("pynetft").joinpath("py.typed").is_file()
 

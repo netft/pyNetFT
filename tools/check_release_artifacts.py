@@ -12,6 +12,7 @@ _PLATFORM_ARCHITECTURES = frozenset(
         ("manylinux2014", "aarch64"),
         ("macosx_11_0", "x86_64"),
         ("macosx_11_0", "arm64"),
+        ("win", "amd64"),
     }
 )
 _PLATFORM_COMPONENTS = {
@@ -25,6 +26,7 @@ _PLATFORM_COMPONENTS = {
     ),
     ("macosx_11_0_x86_64",): ("macosx_11_0", "x86_64"),
     ("macosx_11_0_arm64",): ("macosx_11_0", "arm64"),
+    ("win_amd64",): ("win", "amd64"),
 }
 _WHEEL_FILENAME = re.compile(
     r"^pynetft-(?P<version>[^-]+)-(?P<python>cp\d+)-(?P<abi>cp\d+)-"

@@ -16,6 +16,22 @@ class WheelValidationError(RuntimeError):
     pass
 
 
+WINDOWS_RUNTIME_LIBRARIES = {
+    "advapi32.dll",
+    "bcrypt.dll",
+    "crypt32.dll",
+    "iphlpapi.dll",
+    "kernel32.dll",
+    "msvcp140.dll",
+    "secur32.dll",
+    "ucrtbase.dll",
+    "user32.dll",
+    "vcruntime140.dll",
+    "vcruntime140_1.dll",
+    "ws2_32.dll",
+}
+
+
 def _require_exactly_one(members: set[str], pattern: str, description: str) -> str:
     matches = sorted(member for member in members if re.fullmatch(pattern, member))
     if len(matches) != 1:
@@ -54,6 +70,24 @@ def validate_macos_dependencies(dependencies: set[str]) -> None:
         )
 
 
+def validate_windows_dependencies(dependencies: set[str]) -> None:
+    external = sorted(
+        dependency
+        for dependency in dependencies
+        if dependency.lower() not in WINDOWS_RUNTIME_LIBRARIES
+        and not re.fullmatch(r"python3\d+\.dll", dependency, flags=re.IGNORECASE)
+        and not re.fullmatch(
+            r"api-ms-win-(?:core|crt)-[a-z0-9-]+\.dll",
+            dependency,
+            flags=re.IGNORECASE,
+        )
+    )
+    if external:
+        raise WheelValidationError(
+            f"native extension has non-system dependencies: {', '.join(external)}"
+        )
+
+
 def _needed_libraries(binary: bytes) -> set[str]:
     from elftools.elf.elffile import ELFFile
 
@@ -61,6 +95,16 @@ def _needed_libraries(binary: bytes) -> set[str]:
     if dynamic is None:
         raise WheelValidationError("native extension has no ELF dynamic section")
     return {str(tag.needed) for tag in dynamic.iter_tags() if tag.entry.d_tag == "DT_NEEDED"}
+
+
+def _pe_imported_libraries(binary: bytes) -> set[str]:
+    import pefile
+
+    image = pefile.PE(data=binary, fast_load=True)
+    image.parse_data_directories(
+        directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_IMPORT"]]
+    )
+    return {entry.dll.decode("ascii") for entry in getattr(image, "DIRECTORY_ENTRY_IMPORT", ())}
 
 
 def _wheel_platform(path: Path) -> str:
@@ -73,9 +117,12 @@ def _wheel_platform(path: Path) -> str:
     platform_tags = components[-1].split(".")
     is_linux = any(tag.startswith(("linux_", "manylinux", "musllinux")) for tag in platform_tags)
     is_macos = any(tag.startswith("macosx_") for tag in platform_tags)
-    if is_linux == is_macos:
+    is_windows = any(tag.startswith("win_") for tag in platform_tags)
+    if sum((is_linux, is_macos, is_windows)) != 1:
         raise WheelValidationError(f"unsupported wheel platform tag in {path}")
-    return "linux" if is_linux else "macos"
+    if is_linux:
+        return "linux"
+    return "macos" if is_macos else "windows"
 
 
 def _dependencies_from_tool_output(output: str) -> set[str]:
@@ -112,6 +159,13 @@ def _validate_native_dependencies(
             )
         validate_needed_libraries(_needed_libraries(archive.read(extension)))
         return
+    if platform == "windows":
+        if sys.platform != "win32":
+            raise WheelValidationError(
+                f"native inspection for Windows wheel requires a Windows host: {path}"
+            )
+        validate_windows_dependencies(_pe_imported_libraries(archive.read(extension)))
+        return
     if sys.platform != "darwin":
         raise WheelValidationError(
             f"native inspection for macOS wheel requires a macOS host: {path}"
@@ -133,7 +187,7 @@ def validate_wheel(path: Path, *, self_contained: bool = False) -> None:
 
         extension = _require_exactly_one(
             members,
-            r"pynetft/_native(?:\.[^/]+)?\.so",
+            r"pynetft/_native(?:\.[^/]+)?\.(?:so|pyd)",
             "private native extension",
         )
         if self_contained:

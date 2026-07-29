@@ -35,15 +35,16 @@ def _write_complete_inventory(root: Path) -> list[str]:
     for python in ("cp310", "cp311", "cp312", "cp313", "cp314"):
         wheel_names.extend(
             (
-                f"pynetft-2.0.1-{python}-{python}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
-                f"pynetft-2.0.1-{python}-{python}-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
-                f"pynetft-2.0.1-{python}-{python}-macosx_11_0_x86_64.whl",
-                f"pynetft-2.0.1-{python}-{python}-macosx_11_0_arm64.whl",
+                f"pynetft-2.1.0-{python}-{python}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+                f"pynetft-2.1.0-{python}-{python}-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
+                f"pynetft-2.1.0-{python}-{python}-macosx_11_0_x86_64.whl",
+                f"pynetft-2.1.0-{python}-{python}-macosx_11_0_arm64.whl",
+                f"pynetft-2.1.0-{python}-{python}-win_amd64.whl",
             )
         )
     for name in wheel_names:
         (root / name).touch()
-    (root / "pynetft-2.0.1.tar.gz").touch()
+    (root / "pynetft-2.1.0.tar.gz").touch()
     return wheel_names
 
 
@@ -54,9 +55,10 @@ def _write_complete_auditwheel_inventory(root: Path) -> None:
             "manylinux2014_aarch64.manylinux_2_17_aarch64",
             "macosx_11_0_x86_64",
             "macosx_11_0_arm64",
+            "win_amd64",
         ):
-            (root / f"pynetft-2.0.1-{python}-{python}-{platform}.whl").touch()
-    (root / "pynetft-2.0.1.tar.gz").touch()
+            (root / f"pynetft-2.1.0-{python}-{python}-{platform}.whl").touch()
+    (root / "pynetft-2.1.0.tar.gz").touch()
 
 
 def _git(repository: Path, *arguments: str, input_text: str | None = None) -> str:
@@ -115,7 +117,7 @@ def test_release_versions_and_changelog_heading_agree() -> None:
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
-    assert version == "2.0.1"
+    assert version == "2.1.0"
     assert re.search(
         rf"^project\(pynetft VERSION {re.escape(version)} LANGUAGES CXX\)$",
         cmake,
@@ -135,15 +137,28 @@ def test_core_snapshot_identifies_the_pinned_release() -> None:
     )
 
     assert metadata["repository"] == "https://github.com/netft/netft-cpp"
-    assert metadata["tag"] == "v0.2.2"
-    assert metadata["commit"] == "e424c401587052f03de9b94f76f1e86b78902105"
+    assert metadata["tag"] == "v0.3.0"
+    assert metadata["commit"] == "46ee05639f818a17c1cfe604d0d77b1feb8f9b2b"
 
     core_cmake = (ROOT / "core" / "CMakeLists.txt").read_text(encoding="utf-8")
     assert re.search(
-        r"^project\(netft VERSION 0\.2\.2 LANGUAGES CXX\)$",
+        r"^project\(netft VERSION 0\.3\.0 LANGUAGES CXX\)$",
         core_cmake,
         re.MULTILINE,
     )
+
+
+def test_python_build_disables_the_core_cli_and_marks_static_windows_curl() -> None:
+    cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+
+    assert 'set(NETFT_BUILD_CLI OFF CACHE BOOL "" FORCE)' in cmake
+    assert re.search(
+        r"if\(WIN32\).*target_compile_definitions\(netft PRIVATE CURL_STATICLIB\).*endif\(\)",
+        cmake,
+        re.DOTALL,
+    )
+    for library in ("advapi32", "bcrypt", "crypt32", "iphlpapi", "secur32", "ws2_32"):
+        assert library in cmake
 
 
 def test_core_snapshot_contains_only_the_controlled_upstream_paths() -> None:
@@ -192,12 +207,12 @@ def test_source_build_metadata_requires_libcurl_7_63() -> None:
 def test_release_metadata_tool_validates_tag_and_extracts_current_section() -> None:
     tool = _load_tool("release_metadata")
 
-    metadata = tool.validate_release(ROOT, "v2.0.1")
+    metadata = tool.validate_release(ROOT, "v2.1.0")
     notes = tool.changelog_notes(ROOT / "CHANGELOG.md", metadata.version)
 
-    assert metadata.version == "2.0.1"
-    assert metadata.tag == "v2.0.1"
-    assert metadata.release_date.isoformat() == "2026-07-25"
+    assert metadata.version == "2.1.0"
+    assert metadata.tag == "v2.1.0"
+    assert metadata.release_date.isoformat() == "2026-07-29"
     assert notes
 
     with pytest.raises(tool.ReleaseMetadataError):
@@ -276,7 +291,7 @@ def test_release_workflow_builds_and_validates_the_complete_artifact_matrix() ->
     assert wheels["needs"] == "validate"
 
     assemble = jobs["assemble"]
-    assert set(assemble["needs"]) == {"wheels", "macos-wheels", "sdist"}
+    assert set(assemble["needs"]) == {"wheels", "macos-wheels", "windows-wheels", "sdist"}
     download_steps = [
         step
         for step in assemble["steps"]
@@ -369,6 +384,40 @@ def test_release_workflow_builds_and_native_validates_macos_wheels() -> None:
     assert macos["steps"][upload_index]["with"]["if-no-files-found"] == "error"
 
 
+def test_release_workflow_builds_and_native_validates_windows_wheels() -> None:
+    workflow = _workflow()
+    windows = workflow["jobs"]["windows-wheels"]
+
+    assert windows["needs"] == "validate"
+    assert windows["runs-on"] == "windows-2025"
+    install_run = next(
+        step["run"] for step in windows["steps"] if "pip install" in step.get("run", "")
+    )
+    assert "cibuildwheel==3.4.1" in install_run
+    assert "pefile" in install_run
+    assert "twine" in install_run
+
+    build_step = next(
+        step for step in windows["steps"] if "python -m cibuildwheel" in step.get("run", "")
+    )
+    assert "--platform windows" in build_step["run"]
+    assert build_step["env"]["CIBW_ARCHS_WINDOWS"] == "AMD64"
+
+    validation_run = next(
+        step["run"] for step in windows["steps"] if "tools/check_wheel.py" in step.get("run", "")
+    )
+    assert "$wheels = Get-ChildItem wheelhouse/*.whl" in validation_run
+    assert "python -m twine check $wheels" in validation_run
+    assert "python tools/check_wheel.py --self-contained $wheels" in validation_run
+    upload = next(
+        step
+        for step in windows["steps"]
+        if step.get("uses", "").startswith("actions/upload-artifact@")
+    )
+    assert upload["with"]["name"] == "release-wheels-windows-x86_64"
+    assert upload["with"]["path"] == "wheelhouse/*.whl"
+
+
 def test_release_workflow_uses_oidc_only_for_pypi_and_separates_github_write() -> None:
     workflow = _workflow()
     jobs = workflow["jobs"]
@@ -418,19 +467,19 @@ def test_release_artifact_inventory_rejects_missing_or_duplicate_matrix_entries(
     tool = _load_tool("check_release_artifacts")
     wheel_names = _write_complete_inventory(tmp_path)
 
-    tool.validate_inventory(tmp_path, "2.0.1")
+    tool.validate_inventory(tmp_path, "2.1.0")
 
     missing_macos_wheel = next(name for name in wheel_names if "macosx_11_0_arm64" in name)
     (tmp_path / missing_macos_wheel).unlink()
     with pytest.raises(tool.ReleaseArtifactError):
-        tool.validate_inventory(tmp_path, "2.0.1")
+        tool.validate_inventory(tmp_path, "2.1.0")
 
     (tmp_path / missing_macos_wheel).touch()
     duplicate = tmp_path / "duplicate" / wheel_names[0]
     duplicate.parent.mkdir()
     duplicate.touch()
     with pytest.raises(tool.ReleaseArtifactError):
-        tool.validate_inventory(tmp_path, "2.0.1")
+        tool.validate_inventory(tmp_path, "2.1.0")
 
 
 def test_release_artifact_inventory_accepts_auditwheel_platform_tag_order(
@@ -439,7 +488,7 @@ def test_release_artifact_inventory_accepts_auditwheel_platform_tag_order(
     tool = _load_tool("check_release_artifacts")
     _write_complete_auditwheel_inventory(tmp_path)
 
-    tool.validate_inventory(tmp_path, "2.0.1")
+    tool.validate_inventory(tmp_path, "2.1.0")
 
 
 @pytest.mark.parametrize(
@@ -447,27 +496,27 @@ def test_release_artifact_inventory_accepts_auditwheel_platform_tag_order(
     (
         (
             "manylinux_2_17_x86_64.manylinux2014_x86_64",
-            "pynetft-2.0.1-cp310-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+            "pynetft-2.1.0-cp310-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
         ),
         (
             "manylinux_2_17_x86_64.manylinux2014_x86_64",
-            "pynetft-2.0.1-cp310-cp310-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl",
+            "pynetft-2.1.0-cp310-cp310-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl",
         ),
         (
             "manylinux_2_17_x86_64.manylinux2014_x86_64",
-            "pynetft-2.0.1-cp310-cp310-linux_x86_64.whl",
+            "pynetft-2.1.0-cp310-cp310-linux_x86_64.whl",
         ),
         (
             "manylinux_2_17_x86_64.manylinux2014_x86_64",
-            "pynetft-2.0.1-cp310-cp310-manylinux2014_x86_64.whl",
+            "pynetft-2.1.0-cp310-cp310-manylinux2014_x86_64.whl",
         ),
         (
             "manylinux_2_17_x86_64.manylinux2014_x86_64",
-            "pynetft-2.0.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.linux_x86_64.whl",
+            "pynetft-2.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.linux_x86_64.whl",
         ),
         (
             "manylinux_2_17_x86_64.manylinux2014_x86_64",
-            "pynetft-2.0.1-cp310-cp310-manylinux_2_17_x86_64."
+            "pynetft-2.1.0-cp310-cp310-manylinux_2_17_x86_64."
             "manylinux2014_x86_64.manylinux2014_x86_64.whl",
         ),
         (
@@ -476,11 +525,11 @@ def test_release_artifact_inventory_accepts_auditwheel_platform_tag_order(
         ),
         (
             "macosx_11_0_x86_64",
-            "pynetft-2.0.1-cp310-cp310-macosx_11_0_universal2.whl",
+            "pynetft-2.1.0-cp310-cp310-macosx_11_0_universal2.whl",
         ),
         (
             "macosx_11_0_x86_64",
-            "pynetft-2.0.1-cp310-cp310-macosx_11_1_x86_64.whl",
+            "pynetft-2.1.0-cp310-cp310-macosx_11_1_x86_64.whl",
         ),
     ),
 )
@@ -494,7 +543,7 @@ def test_release_artifact_inventory_rejects_invalid_python_or_platform_tags(
     (tmp_path / replacement).touch()
 
     with pytest.raises(tool.ReleaseArtifactError):
-        tool.validate_inventory(tmp_path, "2.0.1")
+        tool.validate_inventory(tmp_path, "2.1.0")
 
 
 def test_release_tag_verifier_accepts_authorized_main_tag(tmp_path: Path) -> None:

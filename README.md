@@ -10,18 +10,18 @@
 
 pyNetFT is a synchronous, typed Python client for ATI Industrial Automation Net F/T Ethernet force/torque sensors. It discovers the sensor calibration, streams RDT measurements through a native C++ core, and exposes raw counts, physical measurements, health, and recovery information without requiring NumPy.
 
-- **Tested native core:** the protocol and recovery implementation is pinned to [netft-cpp 0.2.2](https://github.com/netft/netft-cpp/releases/tag/v0.2.2), includes its GCC 10/manylinux2014 compatibility fix and corrected libcurl minimum, and is exercised with offline fake sensors and native sanitizers.
+- **Tested native core:** the protocol and recovery implementation is pinned to [netft-cpp 0.3.0](https://github.com/netft/netft-cpp/releases/tag/v0.3.0) and is exercised with offline fake sensors and native sanitizers.
 - **Sensor-aware data:** calibration, force and torque units, configuration revisions, sequence progress, and faults remain visible to the application.
-- **Self-contained typed wheels:** Linux and macOS wheels include the native core and a minimal static HTTP-only curl build, plus inline type information for Python 3.10–3.14.
+- **Self-contained typed wheels:** Linux, macOS, and Windows wheels include the native core and a minimal static HTTP-only curl build, plus inline type information for Python 3.10–3.14.
 
 ## Supported platforms
 
 | Install method | Platform | Support |
 | --- | --- | --- |
-| PyPI | Linux and macOS (x86_64 and ARM64), CPython 3.10–3.14 | Supported |
-| Source | Linux, macOS, and other POSIX systems, CPython 3.10–3.14 | Best effort |
+| PyPI | Linux and macOS (x86_64 and ARM64), Windows (x86_64), CPython 3.10–3.14 | Supported |
+| Source | Linux, macOS, Windows, and other supported C++17 platforms, CPython 3.10–3.14 | Best effort |
 
-Windows, PyPy, and asyncio are not supported by the 2.x package.
+PyPy and asyncio are not supported by the 2.x package.
 
 ## Installation
 
