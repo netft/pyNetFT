@@ -1,12 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(netft VERSION 0.2.2 LANGUAGES CXX)
+project(netft VERSION 0.3.0 LANGUAGES CXX)
 
 include(CTest)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 option(NETFT_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
+option(NETFT_BUILD_CLI "Build the netft command-line tool" ON)
 
 add_library(netft_sanitizers INTERFACE)
 if(NETFT_SANITIZERS)
@@ -31,11 +32,16 @@ add_library(netft
   src/client.cpp
   src/detail/client_impl.cpp
   src/detail/fault_latch.cpp
-  src/detail/posix_transport.cpp
   src/detail/protocol.cpp
   src/detail/sequence.cpp
   src/detail/xml_config.cpp
 )
+if(WIN32)
+  target_sources(netft PRIVATE src/detail/udp_transport_windows.cpp)
+  target_link_libraries(netft PRIVATE ws2_32)
+else()
+  target_sources(netft PRIVATE src/detail/udp_transport_posix.cpp)
+endif()
 add_library(netft::netft ALIAS netft)
 
 target_compile_definitions(netft PRIVATE NETFT_BUILDING_LIBRARY)
@@ -62,14 +68,16 @@ target_link_libraries(netft
     $<BUILD_INTERFACE:netft_sanitizers>
 )
 
-add_library(netft_cli_lib STATIC app/cli.cpp)
-target_compile_features(netft_cli_lib PUBLIC cxx_std_17)
-target_include_directories(netft_cli_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/app)
-target_link_libraries(netft_cli_lib PUBLIC netft::netft)
+if(NETFT_BUILD_CLI)
+  add_library(netft_cli_lib STATIC app/cli.cpp)
+  target_compile_features(netft_cli_lib PUBLIC cxx_std_17)
+  target_include_directories(netft_cli_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/app)
+  target_link_libraries(netft_cli_lib PUBLIC netft::netft)
 
-add_executable(netft_cli app/main.cpp)
-set_target_properties(netft_cli PROPERTIES OUTPUT_NAME netft)
-target_link_libraries(netft_cli PRIVATE netft_cli_lib)
+  add_executable(netft_cli app/main.cpp)
+  set_target_properties(netft_cli PROPERTIES OUTPUT_NAME netft)
+  target_link_libraries(netft_cli PRIVATE netft_cli_lib)
+endif()
 
 install(
   DIRECTORY include/netft
@@ -82,10 +90,12 @@ install(
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
-install(
-  TARGETS netft_cli
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
+if(NETFT_BUILD_CLI)
+  install(
+    TARGETS netft_cli
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
+endif()
 
 set(netft_cmake_install_dir "${CMAKE_INSTALL_LIBDIR}/cmake/netft")
 configure_package_config_file(

@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## 2.1.0 - 2026-07-29
+
+### Added
+
+- Publish self-contained CPython 3.10–3.14 wheels for 64-bit Windows.
+
+### Changed
+
+- Update the pinned native core to netft-cpp 0.3.0, including its WinSock transport and cross-platform lifecycle coverage.
+- Build a pinned static HTTP-only curl dependency for Windows wheels.
+
 ## 2.0.1 - 2026-07-25
 
 ### Added

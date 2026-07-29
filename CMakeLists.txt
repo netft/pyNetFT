@@ -1,16 +1,28 @@
 cmake_minimum_required(VERSION 3.16)
-project(pynetft VERSION 2.0.1 LANGUAGES CXX)
+project(pynetft VERSION 2.1.0 LANGUAGES CXX)
 
 option(PYNETFT_BUILD_TESTING "Build pyNetFT native tests" OFF)
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(NETFT_BUILD_CLI OFF CACHE BOOL "" FORCE)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
 
 add_subdirectory(core EXCLUDE_FROM_ALL)
+if(WIN32)
+  target_compile_definitions(netft PRIVATE CURL_STATICLIB)
+  target_link_libraries(netft PRIVATE
+    advapi32
+    bcrypt
+    crypt32
+    iphlpapi
+    secur32
+    ws2_32
+  )
+endif()
 
 pybind11_add_module(_native MODULE
   bindings/python/bind_types.cpp

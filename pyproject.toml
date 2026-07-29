@@ -7,7 +7,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynetft"
-version = "2.0.1"
+version = "2.1.0"
 description = "Python client for ATI Net F/T Ethernet force/torque sensors"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,6 +16,8 @@ license-files = ["LICENSE", "LICENSES/*", "core/LICENSE"]
 authors = [{ name = "Xudong Han" }]
 classifiers = [
   "Development Status :: 4 - Beta",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: C++",
   "Programming Language :: Python :: 3",
@@ -96,3 +98,8 @@ archs = ["x86_64", "arm64"]
 before-all = "bash {project}/tools/build_macos_curl.sh"
 environment = { MACOSX_DEPLOYMENT_TARGET = "11.0", PYNETFT_CURL_PREFIX = "$RUNNER_TEMP/pynetft-curl", CMAKE_ARGS = "-DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON -DCURL_NO_CURL_CMAKE=ON -DCURL_USE_STATIC_LIBS=ON -DCURL_LIBRARY:FILEPATH=$RUNNER_TEMP/pynetft-curl/lib/libcurl.a -DCURL_INCLUDE_DIR:PATH=$RUNNER_TEMP/pynetft-curl/include" }
 repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.windows]
+archs = ["AMD64"]
+before-all = "powershell -NoProfile -ExecutionPolicy Bypass -File {project}/tools/build_windows_curl.ps1"
+environment = { CMAKE_ARGS = "-DCURL_NO_CURL_CMAKE=ON -DCURL_USE_STATIC_LIBS=ON -DCURL_LIBRARY:FILEPATH=C:/pynetft-curl/lib/libcurl.lib -DCURL_INCLUDE_DIR:PATH=C:/pynetft-curl/include" }

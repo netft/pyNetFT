@@ -44,12 +44,12 @@ def _valid_wheel_members(extension: str) -> tuple[str, ...]:
         "pynetft/__init__.py",
         extension,
         "pynetft/py.typed",
-        "pynetft-2.0.1.dist-info/METADATA",
-        "pynetft-2.0.1.dist-info/WHEEL",
-        "pynetft-2.0.1.dist-info/licenses/LICENSE",
-        "pynetft-2.0.1.dist-info/licenses/LICENSES/MIT.txt",
-        "pynetft-2.0.1.dist-info/licenses/LICENSES/curl.txt",
-        "pynetft-2.0.1.dist-info/licenses/core/LICENSE",
+        "pynetft-2.1.0.dist-info/METADATA",
+        "pynetft-2.1.0.dist-info/WHEEL",
+        "pynetft-2.1.0.dist-info/licenses/LICENSE",
+        "pynetft-2.1.0.dist-info/licenses/LICENSES/MIT.txt",
+        "pynetft-2.1.0.dist-info/licenses/LICENSES/curl.txt",
+        "pynetft-2.1.0.dist-info/licenses/core/LICENSE",
     )
 
 
@@ -90,6 +90,36 @@ def test_cibuildwheel_configures_separate_native_macos_wheels() -> None:
     assert "/pynetft-curl/lib/libcurl.a" in macos["environment"]["CMAKE_ARGS"]
     assert "/pynetft-curl/include" in macos["environment"]["CMAKE_ARGS"]
     assert "delocate-wheel" in macos["repair-wheel-command"]
+
+
+def test_cibuildwheel_configures_native_windows_wheels_with_static_curl() -> None:
+    windows = _project_configuration()["tool"]["cibuildwheel"]["windows"]  # type: ignore[index]
+
+    assert windows["archs"] == ["AMD64"]
+    assert windows["before-all"] == (
+        "powershell -NoProfile -ExecutionPolicy Bypass -File {project}/tools/build_windows_curl.ps1"
+    )
+    assert "-DCURL_USE_STATIC_LIBS=ON" in windows["environment"]["CMAKE_ARGS"]
+    assert "C:/pynetft-curl/lib/libcurl.lib" in windows["environment"]["CMAKE_ARGS"]
+    assert "C:/pynetft-curl/include" in windows["environment"]["CMAKE_ARGS"]
+
+
+def test_windows_curl_builder_is_pinned_and_produces_only_a_static_library() -> None:
+    script = (ROOT / "tools" / "build_windows_curl.ps1").read_text(encoding="utf-8")
+
+    assert "8.21.0" in script
+    assert "aa1b66a70eace83dc624508745646c08ae561de512ab403adffb93ac87fc72e6" in script
+    assert "System.Security.Cryptography.SHA256" in script
+    assert "Get-FileHash" not in script
+    assert "vswhere.exe" in script
+    assert '"Visual Studio 18 2026"' in script
+    assert '"Visual Studio 17 2022"' in script
+    assert "--config Release" in script
+    assert "-DHTTP_ONLY=ON" in script
+    assert "-DBUILD_SHARED_LIBS=OFF" in script
+    assert "-DBUILD_STATIC_LIBS=ON" in script
+    assert "libcurl.lib" in script
+    assert "libcurl.dll" in script
 
 
 @pytest.mark.parametrize(
@@ -358,19 +388,64 @@ def test_wheel_workflow_has_smoke_and_full_build_modes() -> None:
     assert "publish" not in workflow["jobs"]
 
 
+def test_wheel_workflow_builds_and_validates_windows_wheels() -> None:
+    with (ROOT / ".github" / "workflows" / "wheels.yml").open(encoding="utf-8") as stream:
+        workflow = yaml.load(stream, Loader=yaml.BaseLoader)
+
+    for name, event_condition, artifact_name, build_override in (
+        (
+            "windows-smoke",
+            "github.event_name == 'pull_request'",
+            "wheels-smoke-windows-x86_64",
+            "cp310-*",
+        ),
+        (
+            "windows-wheels",
+            "github.event_name != 'pull_request'",
+            "wheels-windows-x86_64",
+            None,
+        ),
+    ):
+        windows = workflow["jobs"][name]
+        assert windows["if"] == event_condition
+        assert windows["runs-on"] == "windows-2025"
+        install = next(
+            step for step in windows["steps"] if "cibuildwheel==3.4.1" in step.get("run", "")
+        )
+        assert "pefile" in install["run"]
+        build = next(
+            step
+            for step in windows["steps"]
+            if step.get("run", "").startswith("python -m cibuildwheel")
+        )
+        assert build["env"]["CIBW_ARCHS_WINDOWS"] == "AMD64"
+        assert build["env"].get("CIBW_BUILD") == build_override
+        assert "--platform windows" in build["run"]
+        validation = next(
+            step for step in windows["steps"] if "tools/check_wheel.py" in step.get("run", "")
+        )
+        assert "--self-contained" in validation["run"]
+        upload = next(
+            step
+            for step in windows["steps"]
+            if step.get("uses", "").startswith("actions/upload-artifact@")
+        )
+        assert upload["with"]["name"] == artifact_name
+
+
 def test_wheel_checker_accepts_only_the_private_runtime_payload(tmp_path: Path) -> None:
     checker = _load_wheel_checker()
-    wheel = tmp_path / "pynetft-2.0.1-cp314-cp314-manylinux2014_x86_64.whl"
+    wheel = tmp_path / "pynetft-2.1.0-cp314-cp314-manylinux2014_x86_64.whl"
     required = (
         "pynetft/__init__.py",
         "pynetft/_native.cpython-314-x86_64-linux-gnu.so",
         "pynetft/py.typed",
-        "pynetft-2.0.1.dist-info/METADATA",
-        "pynetft-2.0.1.dist-info/WHEEL",
-        "pynetft-2.0.1.dist-info/licenses/LICENSE",
-        "pynetft-2.0.1.dist-info/licenses/LICENSES/MIT.txt",
-        "pynetft-2.0.1.dist-info/licenses/LICENSES/curl.txt",
-        "pynetft-2.0.1.dist-info/licenses/core/LICENSE",
+        "pynetft-2.1.0.dist-info/METADATA",
+        "pynetft-2.1.0.dist-info/WHEEL",
+        "pynetft-2.1.0.dist-info/licenses/LICENSE",
+        "pynetft-2.1.0.dist-info/licenses/LICENSES/MIT.txt",
+        "pynetft-2.1.0.dist-info/licenses/LICENSES/curl.txt",
+        "pynetft-2.1.0.dist-info/licenses/core/LICENSE",
     )
     _write_wheel(wheel, members=required)
 
@@ -380,8 +455,8 @@ def test_wheel_checker_accepts_only_the_private_runtime_payload(tmp_path: Path) 
         "bin/netft",
         "include/netft/client.hpp",
         "lib/libnetft.so",
-        "pynetft-2.0.1.data/scripts/netft",
-        "pynetft-2.0.1.data/headers/netft/client.hpp",
+        "pynetft-2.1.0.data/scripts/netft",
+        "pynetft-2.1.0.data/headers/netft/client.hpp",
     ):
         rejected = tmp_path / f"rejected-{forbidden.replace('/', '-')}.whl"
         _write_wheel(rejected, members=(*required, forbidden))
@@ -393,12 +468,12 @@ def test_wheel_checker_rejects_missing_or_duplicate_native_extensions(tmp_path: 
     checker = _load_wheel_checker()
     base = (
         "pynetft/py.typed",
-        "pynetft-2.0.1.dist-info/METADATA",
-        "pynetft-2.0.1.dist-info/WHEEL",
-        "pynetft-2.0.1.dist-info/licenses/LICENSE",
-        "pynetft-2.0.1.dist-info/licenses/LICENSES/MIT.txt",
-        "pynetft-2.0.1.dist-info/licenses/LICENSES/curl.txt",
-        "pynetft-2.0.1.dist-info/licenses/core/LICENSE",
+        "pynetft-2.1.0.dist-info/METADATA",
+        "pynetft-2.1.0.dist-info/WHEEL",
+        "pynetft-2.1.0.dist-info/licenses/LICENSE",
+        "pynetft-2.1.0.dist-info/licenses/LICENSES/MIT.txt",
+        "pynetft-2.1.0.dist-info/licenses/LICENSES/curl.txt",
+        "pynetft-2.1.0.dist-info/licenses/core/LICENSE",
     )
     no_extension = tmp_path / "no-extension.whl"
     _write_wheel(no_extension, members=base)
@@ -421,15 +496,15 @@ def test_wheel_checker_rejects_missing_or_duplicate_native_extensions(tmp_path: 
 @pytest.mark.parametrize(
     "license_member",
     (
-        "pynetft-2.0.1.dist-info/licenses/LICENSE",
-        "pynetft-2.0.1.dist-info/licenses/LICENSES/MIT.txt",
-        "pynetft-2.0.1.dist-info/licenses/LICENSES/curl.txt",
-        "pynetft-2.0.1.dist-info/licenses/core/LICENSE",
+        "pynetft-2.1.0.dist-info/licenses/LICENSE",
+        "pynetft-2.1.0.dist-info/licenses/LICENSES/MIT.txt",
+        "pynetft-2.1.0.dist-info/licenses/LICENSES/curl.txt",
+        "pynetft-2.1.0.dist-info/licenses/core/LICENSE",
     ),
 )
 def test_wheel_checker_rejects_each_missing_license(tmp_path: Path, license_member: str) -> None:
     checker = _load_wheel_checker()
-    wheel = tmp_path / "pynetft-2.0.1-cp314-cp314-linux_x86_64.whl"
+    wheel = tmp_path / "pynetft-2.1.0-cp314-cp314-linux_x86_64.whl"
     members = _valid_wheel_members("pynetft/_native.cpython-314-x86_64-linux-gnu.so")
     _write_wheel(wheel, members=tuple(member for member in members if member != license_member))
 
@@ -443,12 +518,12 @@ def test_wheel_checker_rejects_duplicate_zip_entries(tmp_path: Path) -> None:
     members = (
         "pynetft/_native.cpython-314-x86_64-linux-gnu.so",
         "pynetft/py.typed",
-        "pynetft-2.0.1.dist-info/METADATA",
-        "pynetft-2.0.1.dist-info/WHEEL",
-        "pynetft-2.0.1.dist-info/licenses/LICENSE",
-        "pynetft-2.0.1.dist-info/licenses/LICENSES/MIT.txt",
-        "pynetft-2.0.1.dist-info/licenses/LICENSES/curl.txt",
-        "pynetft-2.0.1.dist-info/licenses/core/LICENSE",
+        "pynetft-2.1.0.dist-info/METADATA",
+        "pynetft-2.1.0.dist-info/WHEEL",
+        "pynetft-2.1.0.dist-info/licenses/LICENSE",
+        "pynetft-2.1.0.dist-info/licenses/LICENSES/MIT.txt",
+        "pynetft-2.1.0.dist-info/licenses/LICENSES/curl.txt",
+        "pynetft-2.1.0.dist-info/licenses/core/LICENSE",
     )
     with pytest.warns(UserWarning), zipfile.ZipFile(wheel, "w") as archive:
         for member in (*members, "pynetft/py.typed"):
@@ -466,11 +541,57 @@ def test_wheel_checker_rejects_a_dynamic_libcurl_dependency() -> None:
         checker.validate_needed_libraries({"libc.so.6", "libcurl.so.4"})
 
 
+def test_windows_dependency_validation_rejects_dynamic_libcurl() -> None:
+    checker = _load_wheel_checker()
+
+    checker.validate_windows_dependencies(
+        {"KERNEL32.dll", "python314.dll", "VCRUNTIME140.dll", "WS2_32.dll"}
+    )
+    with pytest.raises(checker.WheelValidationError):
+        checker.validate_windows_dependencies({"KERNEL32.dll", "libcurl.dll"})
+
+
+def test_windows_dependency_validation_rejects_other_external_dlls() -> None:
+    checker = _load_wheel_checker()
+
+    with pytest.raises(checker.WheelValidationError, match="zlib1.dll"):
+        checker.validate_windows_dependencies({"KERNEL32.dll", "zlib1.dll"})
+
+
+def test_workflows_pin_checkout_to_an_immutable_revision() -> None:
+    for workflow in (ROOT / ".github/workflows").glob("*.yml"):
+        contents = workflow.read_text(encoding="utf-8")
+        assert "actions/checkout@v" not in contents
+
+
+def test_self_containment_dispatches_pe_inspection_for_windows_wheels(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    checker = _load_wheel_checker()
+    wheel = tmp_path / "pynetft-2.1.0-cp314-cp314-win_amd64.whl"
+    _write_wheel(
+        wheel,
+        members=_valid_wheel_members("pynetft/_native.cp314-win_amd64.pyd"),
+    )
+    inspected: list[bytes] = []
+
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(
+        checker,
+        "_pe_imported_libraries",
+        lambda binary: inspected.append(binary) or {"KERNEL32.dll", "python314.dll"},
+    )
+
+    checker.validate_wheel(wheel, self_contained=True)
+
+    assert inspected == [b"x"]
+
+
 def test_self_containment_dispatches_elf_inspection_for_linux_wheels(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     checker = _load_wheel_checker()
-    wheel = tmp_path / "pynetft-2.0.1-cp314-cp314-manylinux2014_x86_64.whl"
+    wheel = tmp_path / "pynetft-2.1.0-cp314-cp314-manylinux2014_x86_64.whl"
     _write_wheel(
         wheel,
         members=_valid_wheel_members("pynetft/_native.cpython-314-x86_64-linux-gnu.so"),
@@ -493,7 +614,7 @@ def test_self_containment_extracts_and_inspects_macos_extensions_with_otool(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     checker = _load_wheel_checker()
-    wheel = tmp_path / "pynetft-2.0.1-cp314-cp314-macosx_11_0_arm64.whl"
+    wheel = tmp_path / "pynetft-2.1.0-cp314-cp314-macosx_11_0_arm64.whl"
     _write_wheel(
         wheel,
         members=_valid_wheel_members("pynetft/_native.cpython-314-darwin.so"),
@@ -560,7 +681,7 @@ def test_macos_self_containment_rejects_an_otool_package_manager_dependency(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     checker = _load_wheel_checker()
-    wheel = tmp_path / "pynetft-2.0.1-cp314-cp314-macosx_11_0_x86_64.whl"
+    wheel = tmp_path / "pynetft-2.1.0-cp314-cp314-macosx_11_0_x86_64.whl"
     _write_wheel(
         wheel,
         members=_valid_wheel_members("pynetft/_native.cpython-314-darwin.so"),
@@ -585,8 +706,8 @@ def test_macos_self_containment_rejects_an_otool_package_manager_dependency(
 @pytest.mark.parametrize(
     ("host", "wheel_name", "message"),
     (
-        ("darwin", "pynetft-2.0.1-cp314-cp314-manylinux2014_x86_64.whl", "Linux"),
-        ("linux", "pynetft-2.0.1-cp314-cp314-macosx_11_0_arm64.whl", "macOS"),
+        ("darwin", "pynetft-2.1.0-cp314-cp314-manylinux2014_x86_64.whl", "Linux"),
+        ("linux", "pynetft-2.1.0-cp314-cp314-macosx_11_0_arm64.whl", "macOS"),
     ),
 )
 def test_native_inspection_rejects_the_wrong_host(
@@ -615,8 +736,8 @@ def test_auditwheel_inspects_multiple_wheels_individually(
 ) -> None:
     checker = _load_wheel_checker()
     wheels = [
-        tmp_path / "pynetft-2.0.1-cp310-cp310-manylinux2014_x86_64.whl",
-        tmp_path / "pynetft-2.0.1-cp311-cp311-manylinux2014_aarch64.whl",
+        tmp_path / "pynetft-2.1.0-cp310-cp310-manylinux2014_x86_64.whl",
+        tmp_path / "pynetft-2.1.0-cp311-cp311-manylinux2014_aarch64.whl",
     ]
     for wheel in wheels:
         wheel.touch()
@@ -648,8 +769,8 @@ def test_delocate_inspects_multiple_macos_wheels_individually(
 ) -> None:
     checker = _load_wheel_checker()
     wheels = [
-        tmp_path / "pynetft-2.0.1-cp310-cp310-macosx_11_0_x86_64.whl",
-        tmp_path / "pynetft-2.0.1-cp310-cp310-macosx_11_0_arm64.whl",
+        tmp_path / "pynetft-2.1.0-cp310-cp310-macosx_11_0_x86_64.whl",
+        tmp_path / "pynetft-2.1.0-cp310-cp310-macosx_11_0_arm64.whl",
     ]
     for wheel in wheels:
         wheel.touch()
@@ -687,7 +808,7 @@ def test_delocate_rejects_an_external_curl_dependency(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     checker = _load_wheel_checker()
-    wheel = tmp_path / "pynetft-2.0.1-cp310-cp310-macosx_11_0_arm64.whl"
+    wheel = tmp_path / "pynetft-2.1.0-cp310-cp310-macosx_11_0_arm64.whl"
     wheel.touch()
     monkeypatch.setattr(checker, "validate_wheel", lambda *args, **kwargs: None)
     monkeypatch.setattr(sys, "platform", "darwin")
@@ -710,8 +831,8 @@ def test_delocate_rejects_an_external_curl_dependency(
 @pytest.mark.parametrize(
     ("wheel_name", "run_auditwheel", "run_delocate"),
     (
-        ("pynetft-2.0.1-cp310-cp310-macosx_11_0_arm64.whl", True, False),
-        ("pynetft-2.0.1-cp310-cp310-manylinux2014_x86_64.whl", False, True),
+        ("pynetft-2.1.0-cp310-cp310-macosx_11_0_arm64.whl", True, False),
+        ("pynetft-2.1.0-cp310-cp310-manylinux2014_x86_64.whl", False, True),
     ),
 )
 def test_platform_specific_external_inspection_rejects_other_wheel_tags(
@@ -739,7 +860,7 @@ def test_auditwheel_rejects_a_linux_wheel_on_a_non_linux_host(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     checker = _load_wheel_checker()
-    wheel = tmp_path / "pynetft-2.0.1-cp310-cp310-manylinux2014_x86_64.whl"
+    wheel = tmp_path / "pynetft-2.1.0-cp310-cp310-manylinux2014_x86_64.whl"
     wheel.touch()
     monkeypatch.setattr(checker, "validate_wheel", lambda *args, **kwargs: None)
     monkeypatch.setattr(sys, "platform", "darwin")
@@ -762,7 +883,7 @@ def test_delocate_rejects_a_macos_wheel_on_a_non_macos_host(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     checker = _load_wheel_checker()
-    wheel = tmp_path / "pynetft-2.0.1-cp310-cp310-macosx_11_0_arm64.whl"
+    wheel = tmp_path / "pynetft-2.1.0-cp310-cp310-macosx_11_0_arm64.whl"
     wheel.touch()
     monkeypatch.setattr(checker, "validate_wheel", lambda *args, **kwargs: None)
     monkeypatch.setattr(sys, "platform", "linux")

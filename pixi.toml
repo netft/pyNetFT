@@ -68,6 +68,6 @@ check = { depends-on = [
   "native-tidy",
 ] }
 wheel = "python -m build --sdist --wheel --no-isolation"
-wheel-check = "python tools/check_wheel.py dist/pynetft-2.0.1-*.whl"
-sdist-check = "python tools/check_sdist.py dist/pynetft-2.0.1.tar.gz"
+wheel-check = "python tools/check_wheel.py dist/pynetft-2.1.0-*.whl"
+sdist-check = "python tools/check_sdist.py dist/pynetft-2.1.0.tar.gz"
 hardware-test = "python tools/hardware_test.py"
