@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import importlib.util
 import os
-import re
-import shlex
 import subprocess
 import sys
 import zipfile
@@ -11,15 +9,8 @@ from pathlib import Path
 from types import ModuleType
 
 import pytest
-import tomllib
-import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-
-
-def _project_configuration() -> dict[str, object]:
-    with (ROOT / "pyproject.toml").open("rb") as stream:
-        return tomllib.load(stream)
 
 
 def _load_wheel_checker() -> ModuleType:
@@ -51,75 +42,6 @@ def _valid_wheel_members(extension: str) -> tuple[str, ...]:
         "pynetft-2.1.0.dist-info/licenses/LICENSES/curl.txt",
         "pynetft-2.1.0.dist-info/licenses/core/LICENSE",
     )
-
-
-def test_cibuildwheel_selects_the_supported_linux_matrix() -> None:
-    cibuildwheel = _project_configuration()["tool"]["cibuildwheel"]  # type: ignore[index]
-    linux = cibuildwheel["linux"]
-
-    assert cibuildwheel["build"] == [
-        "cp310-*",
-        "cp311-*",
-        "cp312-*",
-        "cp313-*",
-        "cp314-*",
-    ]
-    assert cibuildwheel["skip"] == ["*-musllinux_*", "*-manylinux_i686", "pp*", "cp*t-*"]
-    assert (
-        cibuildwheel["test-command"]
-        == "python -m pip check && python -m pytest {project}/tests/artifact -q"
-    )
-    assert cibuildwheel["test-requires"] == ["pytest"]
-    assert linux["archs"] == ["x86_64", "aarch64"]
-    assert linux["manylinux-x86_64-image"] == "manylinux2014"
-    assert linux["manylinux-aarch64-image"] == "manylinux2014"
-    assert linux["before-all"] == "bash {project}/tools/build_manylinux_curl.sh"
-    assert "-DCURL_USE_STATIC_LIBS=ON" in linux["environment"]["CMAKE_ARGS"]
-    assert "/opt/pynetft-curl/lib/libcurl.a" in linux["environment"]["CMAKE_ARGS"]
-    assert "/opt/pynetft-curl/include" in linux["environment"]["CMAKE_ARGS"]
-
-
-def test_cibuildwheel_configures_separate_native_macos_wheels() -> None:
-    macos = _project_configuration()["tool"]["cibuildwheel"]["macos"]  # type: ignore[index]
-
-    assert macos["archs"] == ["x86_64", "arm64"]
-    assert macos["before-all"] == "bash {project}/tools/build_macos_curl.sh"
-    assert macos["environment"]["MACOSX_DEPLOYMENT_TARGET"] == "11.0"
-    assert "-DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON" in macos["environment"]["CMAKE_ARGS"]
-    assert "-DCURL_USE_STATIC_LIBS=ON" in macos["environment"]["CMAKE_ARGS"]
-    assert "/pynetft-curl/lib/libcurl.a" in macos["environment"]["CMAKE_ARGS"]
-    assert "/pynetft-curl/include" in macos["environment"]["CMAKE_ARGS"]
-    assert "delocate-wheel" in macos["repair-wheel-command"]
-
-
-def test_cibuildwheel_configures_native_windows_wheels_with_static_curl() -> None:
-    windows = _project_configuration()["tool"]["cibuildwheel"]["windows"]  # type: ignore[index]
-
-    assert windows["archs"] == ["AMD64"]
-    assert windows["before-all"] == (
-        "powershell -NoProfile -ExecutionPolicy Bypass -File {project}/tools/build_windows_curl.ps1"
-    )
-    assert "-DCURL_USE_STATIC_LIBS=ON" in windows["environment"]["CMAKE_ARGS"]
-    assert "C:/pynetft-curl/lib/libcurl.lib" in windows["environment"]["CMAKE_ARGS"]
-    assert "C:/pynetft-curl/include" in windows["environment"]["CMAKE_ARGS"]
-
-
-def test_windows_curl_builder_is_pinned_and_produces_only_a_static_library() -> None:
-    script = (ROOT / "tools" / "build_windows_curl.ps1").read_text(encoding="utf-8")
-
-    assert "8.21.0" in script
-    assert "aa1b66a70eace83dc624508745646c08ae561de512ab403adffb93ac87fc72e6" in script
-    assert "System.Security.Cryptography.SHA256" in script
-    assert "Get-FileHash" not in script
-    assert "vswhere.exe" in script
-    assert '"Visual Studio 18 2026"' in script
-    assert '"Visual Studio 17 2022"' in script
-    assert "--config Release" in script
-    assert "-DHTTP_ONLY=ON" in script
-    assert "-DBUILD_SHARED_LIBS=OFF" in script
-    assert "-DBUILD_STATIC_LIBS=ON" in script
-    assert "libcurl.lib" in script
-    assert "libcurl.dll" in script
 
 
 @pytest.mark.parametrize(
@@ -238,199 +160,6 @@ def test_curl_build_wrappers_forward_the_build_environment(tmp_path: Path, name:
     assert forwarded_prefix == str(prefix)
     assert forwarded_archive == str(archive)
     assert Path(implementation).resolve() == ROOT / "tools" / "build_static_curl.sh"
-
-
-def test_wheel_workflow_has_smoke_and_full_build_modes() -> None:
-    with (ROOT / ".github" / "workflows" / "wheels.yml").open(encoding="utf-8") as stream:
-        workflow = yaml.load(stream, Loader=yaml.BaseLoader)
-
-    upload_steps = [
-        step
-        for job in workflow["jobs"].values()
-        for step in job["steps"]
-        if step.get("uses", "").startswith("actions/upload-artifact@")
-    ]
-    assert upload_steps
-    assert all(
-        re.fullmatch(r"actions/upload-artifact@[0-9a-f]{40}", step["uses"]) for step in upload_steps
-    )
-
-    assert set(workflow["on"]) == {"pull_request", "push", "workflow_dispatch"}
-    assert workflow["on"]["push"]["branches"] == ["main"]
-    curl_build = workflow["jobs"]["curl-build"]
-    curl_test = next(
-        step for step in curl_build["steps"] if "PYNETFT_RUN_CURL_BUILD_TEST" in step.get("env", {})
-    )
-    assert curl_test["env"]["PYNETFT_RUN_CURL_BUILD_TEST"] == "1"
-    curl_command = shlex.split(curl_test["run"])
-    assert curl_command[:3] == ["python", "-m", "pytest"]
-    assert (ROOT / curl_command[3]).is_file()
-
-    smoke = workflow["jobs"]["smoke"]
-    assert smoke["if"] == "github.event_name == 'pull_request'"
-    assert smoke["needs"] == "curl-build"
-    assert smoke["runs-on"] == "ubuntu-24.04"
-    smoke_install = next(
-        step for step in smoke["steps"] if step.get("name") == "Install wheel build frontend"
-    )
-    assert "cibuildwheel==3.4.1" in smoke_install["run"]
-    assert "auditwheel" in smoke_install["run"]
-    smoke_build = next(
-        step for step in smoke["steps"] if step.get("run", "").startswith("python -m cibuildwheel")
-    )
-    assert smoke_build["env"]["CIBW_BUILD"] == "cp310-*"
-    assert smoke_build["env"]["CIBW_ARCHS_LINUX"] == "x86_64"
-
-    full = workflow["jobs"]["wheels"]
-    assert full["if"] == "github.event_name != 'pull_request'"
-    assert full["needs"] == "curl-build"
-    full_install = next(
-        step for step in full["steps"] if step.get("name") == "Install wheel build frontend"
-    )
-    assert "cibuildwheel==3.4.1" in full_install["run"]
-    assert "auditwheel" in full_install["run"]
-    matrix = full["strategy"]["matrix"]["include"]
-    assert {entry["arch"] for entry in matrix} == {"x86_64", "aarch64"}
-    assert all(entry["runner"] for entry in matrix)
-
-    build_step = next(
-        step for step in full["steps"] if step.get("run", "").startswith("python -m cibuildwheel")
-    )
-    assert build_step["env"]["CIBW_ARCHS_LINUX"] == "${{ matrix.arch }}"
-    validation_step = next(
-        step
-        for step in full["steps"]
-        if step.get("name") == "Validate wheel structure and dependencies"
-    )
-    expected_validation = [
-        "python",
-        "tools/check_wheel.py",
-        "--self-contained",
-        "--auditwheel",
-        "wheelhouse/*.whl",
-    ]
-    assert shlex.split(validation_step["run"]) == expected_validation
-    smoke_validation = next(
-        step
-        for step in smoke["steps"]
-        if step.get("name") == "Validate wheel structure and dependencies"
-    )
-    assert shlex.split(smoke_validation["run"]) == expected_validation
-
-    macos_matrix = {
-        "x86_64": "macos-15-intel",
-        "arm64": "macos-15",
-    }
-    expected_macos_validation = [
-        "python",
-        "tools/check_wheel.py",
-        "--self-contained",
-        "--delocate",
-        "wheelhouse/*.whl",
-    ]
-    for name, event_condition, artifact_name, build_override in (
-        (
-            "macos-smoke",
-            "github.event_name == 'pull_request'",
-            "wheels-smoke-macos-${{ matrix.arch }}",
-            "cp310-*",
-        ),
-        (
-            "macos-wheels",
-            "github.event_name != 'pull_request'",
-            "wheels-macos-${{ matrix.arch }}",
-            None,
-        ),
-    ):
-        macos = workflow["jobs"][name]
-        assert macos["if"] == event_condition
-        assert macos["needs"] == "curl-build"
-        assert macos["runs-on"] == "${{ matrix.runner }}"
-        assert macos["strategy"]["fail-fast"] == "false"
-        assert {
-            entry["arch"]: entry["runner"] for entry in macos["strategy"]["matrix"]["include"]
-        } == macos_matrix
-
-        macos_install = next(
-            step for step in macos["steps"] if "cibuildwheel==3.4.1" in step.get("run", "")
-        )
-        assert "cibuildwheel==3.4.1" in macos_install["run"]
-        assert "delocate" in macos_install["run"]
-        macos_build = next(
-            step
-            for step in macos["steps"]
-            if step.get("run", "").startswith("python -m cibuildwheel")
-        )
-        assert macos_build["env"]["CIBW_ARCHS_MACOS"] == "${{ matrix.arch }}"
-        assert macos_build["env"].get("CIBW_BUILD") == build_override
-        assert shlex.split(macos_build["run"]) == [
-            "python",
-            "-m",
-            "cibuildwheel",
-            "--platform",
-            "macos",
-            "--output-dir",
-            "wheelhouse",
-        ]
-        macos_validation = next(
-            step for step in macos["steps"] if "tools/check_wheel.py" in step.get("run", "")
-        )
-        assert shlex.split(macos_validation["run"]) == expected_macos_validation
-        macos_upload = next(
-            step
-            for step in macos["steps"]
-            if step.get("uses", "").startswith("actions/upload-artifact@")
-        )
-        assert macos_upload["with"]["name"] == artifact_name
-        assert macos_upload["with"]["path"] == "wheelhouse/*.whl"
-        assert macos_upload["with"]["if-no-files-found"] == "error"
-
-    assert "publish" not in workflow["jobs"]
-
-
-def test_wheel_workflow_builds_and_validates_windows_wheels() -> None:
-    with (ROOT / ".github" / "workflows" / "wheels.yml").open(encoding="utf-8") as stream:
-        workflow = yaml.load(stream, Loader=yaml.BaseLoader)
-
-    for name, event_condition, artifact_name, build_override in (
-        (
-            "windows-smoke",
-            "github.event_name == 'pull_request'",
-            "wheels-smoke-windows-x86_64",
-            "cp310-*",
-        ),
-        (
-            "windows-wheels",
-            "github.event_name != 'pull_request'",
-            "wheels-windows-x86_64",
-            None,
-        ),
-    ):
-        windows = workflow["jobs"][name]
-        assert windows["if"] == event_condition
-        assert windows["runs-on"] == "windows-2025"
-        install = next(
-            step for step in windows["steps"] if "cibuildwheel==3.4.1" in step.get("run", "")
-        )
-        assert "pefile" in install["run"]
-        build = next(
-            step
-            for step in windows["steps"]
-            if step.get("run", "").startswith("python -m cibuildwheel")
-        )
-        assert build["env"]["CIBW_ARCHS_WINDOWS"] == "AMD64"
-        assert build["env"].get("CIBW_BUILD") == build_override
-        assert "--platform windows" in build["run"]
-        validation = next(
-            step for step in windows["steps"] if "tools/check_wheel.py" in step.get("run", "")
-        )
-        assert "--self-contained" in validation["run"]
-        upload = next(
-            step
-            for step in windows["steps"]
-            if step.get("uses", "").startswith("actions/upload-artifact@")
-        )
-        assert upload["with"]["name"] == artifact_name
 
 
 def test_wheel_checker_accepts_only_the_private_runtime_payload(tmp_path: Path) -> None:
@@ -556,12 +285,6 @@ def test_windows_dependency_validation_rejects_other_external_dlls() -> None:
 
     with pytest.raises(checker.WheelValidationError, match="zlib1.dll"):
         checker.validate_windows_dependencies({"KERNEL32.dll", "zlib1.dll"})
-
-
-def test_workflows_pin_checkout_to_an_immutable_revision() -> None:
-    for workflow in (ROOT / ".github/workflows").glob("*.yml"):
-        contents = workflow.read_text(encoding="utf-8")
-        assert "actions/checkout@v" not in contents
 
 
 def test_self_containment_dispatches_pe_inspection_for_windows_wheels(

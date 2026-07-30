@@ -44,9 +44,9 @@ def _build_sdist(destination: Path) -> Path:
 def test_sdist_excludes_generated_caches_and_is_reproducible(tmp_path: Path) -> None:
     checker = _load_sdist_checker()
     pollution = (
-        ROOT / "bindings" / "python" / "__pycache__" / "task10.pyc",
-        ROOT / "core" / ".pytest_cache" / "task10",
-        ROOT / "src" / "pynetft" / "__pycache__" / "task10.pyc",
+        ROOT / "bindings" / "python" / "__pycache__" / "generated-cache.pyc",
+        ROOT / "core" / ".pytest_cache" / "generated-cache",
+        ROOT / "src" / "pynetft" / "__pycache__" / "generated-cache.pyc",
     )
     try:
         for path in pollution:
