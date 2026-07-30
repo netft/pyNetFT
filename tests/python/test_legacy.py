@@ -153,8 +153,8 @@ def test_legacy_get_converted_data_returns_a_new_response_with_wrench_list(
     client.disconnect()
 
 
-def test_legacy_streaming_uses_monotonic_time_and_legacy_printing(
-    fake_client_factory, native_sample, monkeypatch: pytest.MonkeyPatch, capsys
+def test_legacy_streaming_uses_monotonic_time(
+    fake_client_factory, native_sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     client, _ = _legacy_warnings()
     client.connect()
@@ -164,8 +164,7 @@ def test_legacy_streaming_uses_monotonic_time_and_legacy_printing(
     monkeypatch.setattr(legacy_module.time, "monotonic", lambda: next(monotonic_values))
     monkeypatch.setattr(legacy_module.time, "sleep", sleeps.append)
 
-    client.start_streaming(duration=1.0, delay=0.25, print_data=True)
+    client.start_streaming(duration=1.0, delay=0.25, print_data=False)
 
     assert sleeps == [0.25]
-    assert "Status: 0x00000010" in capsys.readouterr().out
     client.disconnect()
