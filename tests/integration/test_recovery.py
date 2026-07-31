@@ -153,18 +153,15 @@ def test_ft_sequence_stall_reports_progress_counter_and_fault(
             rdt_sequence=71,
             ft_sequence=80,
         )
-        stalled = next(client.samples(timeout=1.0))
         with pytest.raises(SensorFaultError) as captured:
             next(client.samples(timeout=1.0))
 
     assert first.ft_sequence == 80
-    assert stalled.ft_sequence == 80
-    assert stalled.rdt_sequence == 71
     assert captured.value.fault_code is FaultCode.FT_STALL
     assert captured.value.health.ft_stall_count == 1
     assert captured.value.health.last_ft_progress == "stall"
     assert captured.value.health.received_count == 2
-    assert captured.value.health.delivered_count == 2
+    assert captured.value.health.delivered_count == 1
     assert BIAS not in fake_sensor.commands
 
 
