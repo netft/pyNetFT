@@ -5,9 +5,10 @@ import argparse
 import hashlib
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
-SELECTED = ("CMakeLists.txt", "LICENSE", "app", "cmake", "include", "src")
+SELECTED = ("CMakeLists.txt", "LICENSE", "cmake", "include", "src")
 
 
 def git(source: Path, *args: str) -> str:
@@ -52,33 +53,47 @@ def sync(source: Path, destination: Path, tag: str) -> None:
     if git(source, "status", "--short"):
         raise SystemExit(f"{source} is not clean")
 
-    destination.mkdir(parents=True, exist_ok=True)
-    for name in SELECTED:
-        target = destination / name
-        if target.is_dir():
-            shutil.rmtree(target)
-        elif target.exists():
-            target.unlink()
-        origin = source / name
-        if origin.is_dir():
-            shutil.copytree(origin, target)
-        else:
-            shutil.copy2(origin, target)
-
-    (destination / "UPSTREAM").write_text(
-        "\n".join(
-            (
-                "repository=https://github.com/netft/netft-cpp",
-                f"tag={tag}",
-                f"commit={commit}",
-                f"paths={','.join(SELECTED)}",
-            )
-        )
-        + "\n",
-        encoding="utf-8",
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    transaction = Path(
+        tempfile.mkdtemp(prefix=f".{destination.name}-sync-", dir=destination.parent)
     )
-    write_manifest(destination)
-    verify(destination)
+    staging = transaction / "snapshot"
+    previous = transaction / "previous"
+    staging.mkdir()
+    try:
+        for name in SELECTED:
+            origin = source / name
+            target = staging / name
+            if origin.is_dir():
+                shutil.copytree(origin, target)
+            else:
+                shutil.copy2(origin, target)
+
+        (staging / "UPSTREAM").write_text(
+            "\n".join(
+                (
+                    "repository=https://github.com/netft/netft-cpp",
+                    f"tag={tag}",
+                    f"commit={commit}",
+                    f"paths={','.join(SELECTED)}",
+                )
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        write_manifest(staging)
+        verify(staging)
+
+        if destination.exists():
+            destination.rename(previous)
+        try:
+            staging.rename(destination)
+        except BaseException:
+            if previous.exists():
+                previous.rename(destination)
+            raise
+    finally:
+        shutil.rmtree(transaction, ignore_errors=True)
 
 
 def main() -> None:

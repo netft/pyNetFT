@@ -8,6 +8,7 @@ All notable changes to this project are documented in this file.
 
 - Update the pinned native core to netft-cpp 0.3.1 so fail-stop clients do not receive
   stalled or backward FT-sequence samples before the corresponding fault.
+- Exclude the upstream legacy CLI sources from the Python package's private core snapshot.
 
 ## 2.1.0 - 2026-07-29
 
