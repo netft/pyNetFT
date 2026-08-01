@@ -6,7 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
-- Update the pinned native core to netft-cpp 0.3.2, including lifecycle-safe
+- Update the pinned native core to netft-cpp 0.3.3, including lifecycle-safe
   client destruction from a sample callback.
 - Exclude the upstream legacy CLI sources from the Python package's private core snapshot.
 
