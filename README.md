@@ -10,7 +10,7 @@
 
 pyNetFT is a synchronous, typed Python client for ATI Industrial Automation Net F/T Ethernet force/torque sensors. It discovers the sensor calibration, streams RDT measurements through a native C++ core, and exposes raw counts, physical measurements, health, and recovery information without requiring NumPy.
 
-- **Tested native core:** the protocol and recovery implementation is pinned to [netft-cpp 0.3.1](https://github.com/netft/netft-cpp/releases/tag/v0.3.1) and is exercised with offline fake sensors and native sanitizers.
+- **Tested native core:** the protocol and recovery implementation is pinned to [netft-cpp 0.3.3](https://github.com/netft/netft-cpp/releases/tag/v0.3.3) and is exercised with offline fake sensors and native sanitizers.
 - **Sensor-aware data:** calibration, force and torque units, configuration revisions, sequence progress, and faults remain visible to the application.
 - **Self-contained typed wheels:** Linux, macOS, and Windows wheels include the native core and a minimal static HTTP-only curl build, plus inline type information for Python 3.10–3.14.
 

@@ -1,13 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(netft VERSION 0.3.1 LANGUAGES CXX)
+project(netft VERSION 0.3.3 LANGUAGES CXX)
 
 include(CTest)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 option(NETFT_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
-option(NETFT_BUILD_CLI "Build the netft command-line tool" ON)
 
 add_library(netft_sanitizers INTERFACE)
 if(NETFT_SANITIZERS)
@@ -68,17 +67,6 @@ target_link_libraries(netft
     $<BUILD_INTERFACE:netft_sanitizers>
 )
 
-if(NETFT_BUILD_CLI)
-  add_library(netft_cli_lib STATIC app/cli.cpp)
-  target_compile_features(netft_cli_lib PUBLIC cxx_std_17)
-  target_include_directories(netft_cli_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/app)
-  target_link_libraries(netft_cli_lib PUBLIC netft::netft)
-
-  add_executable(netft_cli app/main.cpp)
-  set_target_properties(netft_cli PROPERTIES OUTPUT_NAME netft)
-  target_link_libraries(netft_cli PRIVATE netft_cli_lib)
-endif()
-
 install(
   DIRECTORY include/netft
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
@@ -90,13 +78,6 @@ install(
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
-if(NETFT_BUILD_CLI)
-  install(
-    TARGETS netft_cli
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-  )
-endif()
-
 set(netft_cmake_install_dir "${CMAKE_INSTALL_LIBDIR}/cmake/netft")
 configure_package_config_file(
   cmake/netftConfig.cmake.in
