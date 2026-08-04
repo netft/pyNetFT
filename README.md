@@ -2,36 +2,38 @@
 
 [![CI](https://github.com/netft/pyNetFT/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/netft/pyNetFT/actions/workflows/ci.yml)
 [![Wheels](https://github.com/netft/pyNetFT/actions/workflows/wheels.yml/badge.svg?branch=main)](https://github.com/netft/pyNetFT/actions/workflows/wheels.yml)
+[![PyPI](https://img.shields.io/pypi/v/pynetft)](https://pypi.org/project/pynetft/)
 [![CodeQL](https://github.com/netft/pyNetFT/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/netft/pyNetFT/actions/workflows/codeql.yml)
 [![Coverage](https://codecov.io/gh/netft/pyNetFT/graph/badge.svg?branch=main)](https://codecov.io/gh/netft/pyNetFT)
-[![PyPI](https://img.shields.io/pypi/v/pynetft)](https://pypi.org/project/pynetft/)
-[![Python 3.10–3.14](https://img.shields.io/badge/Python-3.10%E2%80%933.14-blue)](https://pypi.org/project/pynetft/)
+[![Python](https://img.shields.io/badge/Python-3.10%E2%80%933.14-blue)](https://pypi.org/project/pynetft/)
 [![License](https://img.shields.io/github/license/netft/pyNetFT?label=license)](LICENSE)
 
-pyNetFT is a synchronous, typed Python client for ATI Industrial Automation Net F/T Ethernet force/torque sensors. It discovers the sensor calibration, streams RDT measurements through a native C++ core, and exposes raw counts, physical measurements, health, and recovery information without requiring NumPy.
+pyNetFT is a synchronous, typed Python SDK for ATI Net F/T Ethernet
+force/torque sensors. It discovers the active sensor calibration and streams
+RDT measurements through a reviewed snapshot of the native
+[netft-cpp](https://github.com/netft/netft-cpp) core.
 
-- **Tested native core:** the protocol and recovery implementation is pinned to [netft-cpp 0.3.3](https://github.com/netft/netft-cpp/releases/tag/v0.3.3) and is exercised with offline fake sensors and native sanitizers.
-- **Sensor-aware data:** calibration, force and torque units, configuration revisions, sequence progress, and faults remain visible to the application.
-- **Self-contained typed wheels:** Linux, macOS, and Windows wheels include the native core and a minimal static HTTP-only curl build, plus inline type information for Python 3.10–3.14.
+## Features
 
-## Supported platforms
-
-| Install method | Platform | Support |
-| --- | --- | --- |
-| PyPI | Linux and macOS (x86_64 and ARM64), Windows (x86_64), CPython 3.10–3.14 | Supported |
-| Source | Linux, macOS, Windows, and other supported C++17 platforms, CPython 3.10–3.14 | Best effort |
-
-PyPy and asyncio are not supported by the 2.x package.
+- Exposes raw counts, calibrated measurements, native units, and stream health.
+- Provides blocking iterator and callback delivery without requiring NumPy.
+- Ships typed, self-contained wheels with the native core and HTTP-only curl.
+- Supports explicit reconnect and fail-stop recovery behavior.
 
 ## Installation
 
-Install a supported wheel from PyPI; it includes curl, so no separately installed curl is needed:
+| Install method | Platform | Support |
+| --- | --- | --- |
+| PyPI wheel | Linux and macOS (x86-64 and ARM64), Windows (x86-64), CPython 3.10–3.14 | Supported |
+| Source | Linux, macOS, Windows, CPython 3.10–3.14 | Best effort |
+
+Install from PyPI:
 
 ```bash
 python -m pip install pynetft
 ```
 
-For a source build, use a C++17 compiler, CMake 3.16 or newer, and system libcurl 7.63.0 or newer:
+Install from source:
 
 ```bash
 git clone https://github.com/netft/pyNetFT.git
@@ -39,11 +41,11 @@ cd pyNetFT
 python -m pip install .
 ```
 
-Source builds use the checked-in native core and do not download `netft-cpp`.
+Supported wheels include curl and require no separate curl installation.
+Source builds require a C++17 compiler, CMake 3.16 or newer, and system
+libcurl 7.63.0 or newer.
 
 ## Quick start
-
-The address below is the ATI factory default. Replace it with the address assigned to your sensor.
 
 ```python
 from pynetft import Client, Config
@@ -56,30 +58,33 @@ with Client(config) as client:
     print(sample.torque, sample.torque_unit.value)
 ```
 
-`Client.samples()` provides blocking iterator delivery. A read timeout raises `TimeoutError`, while a terminal sensor or transport fault raises `SensorFaultError` with structured fault and health data. Applications that integrate with a callback-driven loop can instead pass `callback=` to `Client`; the two delivery modes are mutually exclusive for a client run. See the [API reference](https://github.com/netft/pyNetFT/blob/main/docs/api.md) for lifecycle, callback, timeout, health, and error behavior.
+`192.168.1.1` is the ATI factory-default sensor address. Replace it with the
+address configured for your sensor. Samples preserve the units reported by the
+sensor, including the common ATI combination of newtons and
+newton-millimeters. HTTP discovery and UDP RDT streaming do not provide
+transport encryption, peer authentication, or message integrity; use a
+trusted, isolated sensor network.
 
-### Units and raw counts
+## Documentation
 
-`Sample.force` and `Sample.torque` preserve the units reported by the sensor, including the common ATI combination of newtons and newton-millimeters. pyNetFT does not apply ROS-specific SI conversion. `Sample.wrench` is the six-element physical-value tuple `(Fx, Fy, Fz, Tx, Ty, Tz)`, while `Sample.raw_wrench` contains the six signed integer counts from the RDT record.
+- [Python SDK tutorial](https://netft.dev/docs/tutorials/sdks/python)
+- [Python API reference](https://netft.dev/docs/references/python-api/overview)
+- [Units, status, and faults](https://netft.dev/docs/references/data-formats/units-status-and-faults)
+- [Security and safety](https://netft.dev/docs/references/security-and-safety)
+- [Migrating from pyNetFT 1.x](docs/migration-2.md)
 
-Automatic discovery is the default and should be preferred when the sensor configuration is authoritative. A complete `Calibration` override is available when independently verified fixed values are required.
-
-### Migrating from pyNetFT 1.x
-
-The deprecated `NetFT` and `Response` interfaces remain available throughout 2.x. New code should use `Client`, `Config`, and `Sample`; see the [2.0 migration guide](https://github.com/netft/pyNetFT/blob/main/docs/migration-2.md) for exact call and field mappings.
-
-## Network security
-
-ATI configuration discovery uses HTTP and RDT streaming uses unauthenticated UDP. Deploy the sensor and client on a trusted, isolated network segment, and do not expose either device protocol directly to the Internet or an untrusted shared network. See the [security policy](https://github.com/netft/pyNetFT/blob/main/SECURITY.md) for the threat model and vulnerability reporting instructions.
-
-## Hardware safety
-
-Force/torque measurements can affect motion and protective limits. Validate discovered calibration and units before enabling a controller, detect stale or faulted data, and retain an independent safety-rated control path. `Client.bias()` changes the sensor's software bias; call it only when the sensor is unloaded and the operation is explicitly authorized.
+The deprecated `NetFT` and `Response` interfaces remain available throughout
+2.x. New applications should use `Client`, `Config`, and `Sample`. PyPy and
+asyncio are not supported by the 2.x package.
 
 ## Contributing
 
-Bug reports, hardware compatibility reports, documentation improvements, and focused code contributions are welcome. The [contribution guide](https://github.com/netft/pyNetFT/blob/main/CONTRIBUTING.md) covers the Pixi environment, offline checks, hardware authorization, and native-core synchronization rules.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development environment, tests,
+hardware-testing policy, and native-core synchronization rules. Report
+security issues through [SECURITY.md](SECURITY.md).
 
 ## License
 
-pyNetFT is licensed under the [Apache License 2.0](https://github.com/netft/pyNetFT/blob/main/LICENSE). The [previous pyNetFT MIT license](https://github.com/netft/pyNetFT/blob/main/LICENSES/MIT.txt), the synchronized [netft-cpp license](https://github.com/netft/pyNetFT/blob/main/core/LICENSE), and the [curl license notice](https://github.com/netft/pyNetFT/blob/main/LICENSES/curl.txt) are retained with the source and distribution artifacts.
+pyNetFT is licensed under the [Apache License 2.0](LICENSE). Previous pyNetFT,
+netft-cpp, and curl license notices remain in the source and distribution
+artifacts.
