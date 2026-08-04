@@ -33,8 +33,16 @@ Install from PyPI:
 python -m pip install pynetft
 ```
 
-Supported wheels include curl and require no separate curl installation. A
-source build requires a C++17 compiler, CMake 3.16 or newer, and system
+Install from source:
+
+```bash
+git clone https://github.com/netft/pyNetFT.git
+cd pyNetFT
+python -m pip install .
+```
+
+Supported wheels include curl and require no separate curl installation.
+Source builds require a C++17 compiler, CMake 3.16 or newer, and system
 libcurl 7.63.0 or newer.
 
 ## Quick start
@@ -53,7 +61,9 @@ with Client(config) as client:
 `192.168.1.1` is the ATI factory-default sensor address. Replace it with the
 address configured for your sensor. Samples preserve the units reported by the
 sensor, including the common ATI combination of newtons and
-newton-millimeters.
+newton-millimeters. HTTP discovery and UDP RDT streaming do not provide
+transport encryption, peer authentication, or message integrity; use a
+trusted, isolated sensor network.
 
 ## Documentation
 
