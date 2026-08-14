@@ -7,7 +7,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynetft"
-version = "2.1.0"
+version = "2.1.1"
 description = "Python client for ATI Net F/T Ethernet force/torque sensors"
 readme = "README.md"
 requires-python = ">=3.10"

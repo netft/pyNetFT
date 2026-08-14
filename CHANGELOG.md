@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+## 2.1.1 - 2026-08-14
+
 ### Fixed
 
 - Update the pinned native core to netft-cpp 0.3.3, including lifecycle-safe
