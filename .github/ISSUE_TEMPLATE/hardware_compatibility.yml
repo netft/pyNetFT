@@ -22,7 +22,6 @@ body:
     id: version
     attributes:
       label: pyNetFT version
-      placeholder: 2.0.0
     validations:
       required: true
   - type: input

@@ -12,7 +12,6 @@ body:
     attributes:
       label: pyNetFT version
       description: Release, tag, or commit that shows the problem.
-      placeholder: 2.0.0
     validations:
       required: true
   - type: input
