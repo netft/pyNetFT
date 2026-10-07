@@ -85,13 +85,17 @@ Pass the authorized address only through `NETFT_SENSOR_HOST`. Never commit it. T
 
 ## Cross-repository synchronization
 
-The `netft` organization maintains three separate repositories:
+The `netft` organization maintains seven separate repositories:
 
 - `netft-cpp` is the standalone C++ core and source of truth for shared protocol behavior;
 - `pyNetFT` contains a pinned private core snapshot, Python bindings, and the Python public API; and
-- `ros-netft` contains its own private core snapshot and ROS integration.
+- `ros-netft` contains its own private core snapshot and ROS integration;
+- `netft-cli` owns terminal workflows and its reviewed core adaptation;
+- `netft-viewer` owns desktop interaction, companion and packaging;
+- `netft-docs` maintains shared user guides and version-pinned references at https://netft.dev; and
+- `.github` maintains organization navigation, common templates and issue routing.
 
-There is no automatic runtime or build-time dependency between these repositories. Synchronize a released core into each consumer through separate, reviewable pull requests. Record the exact upstream tag and commit, port consumer-specific integration independently, run that repository's full supported tests, and document intentional differences. Do not claim the snapshots update in lockstep.
+There is no automatic runtime or build-time dependency between these repositories. Synchronize a released core into each consumer through separate, reviewable pull requests. Record the exact upstream tag and commit, port consumer-specific integration independently, run the necessary checks for the affected contract and supported release platforms, and document intentional differences. Do not claim the snapshots update in lockstep.
 
 ## Release workflow
 
