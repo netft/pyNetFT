@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      windows_only:
+        description: Build only the Windows CPython 3.10 smoke wheel
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -15,6 +20,7 @@ concurrency:
 
 jobs:
   curl-build:
+    if: ${{ !inputs.windows_only }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -109,7 +115,7 @@ jobs:
           if-no-files-found: error
 
   windows-smoke:
-    if: github.event_name == 'pull_request'
+    if: ${{ always() && !cancelled() && ((github.event_name == 'pull_request' && needs.curl-build.result == 'success') || inputs.windows_only) }}
     needs: curl-build
     runs-on: windows-2025
     steps:
@@ -141,7 +147,7 @@ jobs:
           if-no-files-found: error
 
   wheels:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && !inputs.windows_only
     needs: curl-build
     strategy:
       fail-fast: false
@@ -181,7 +187,7 @@ jobs:
           if-no-files-found: error
 
   macos-wheels:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && !inputs.windows_only
     needs: curl-build
     strategy:
       fail-fast: false
@@ -221,7 +227,7 @@ jobs:
           if-no-files-found: error
 
   windows-wheels:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && !inputs.windows_only
     needs: curl-build
     runs-on: windows-2025
     steps:

@@ -43,7 +43,15 @@ def verify(root: Path) -> None:
         f"{digest(path)}  {path.relative_to(root).as_posix()}" for path in snapshot_files(root)
     ]
     if actual != expected:
-        raise SystemExit("core snapshot checksum mismatch")
+        expected_by_path = {line.split("  ", 1)[1]: line.split("  ", 1)[0] for line in expected}
+        actual_by_path = {line.split("  ", 1)[1]: line.split("  ", 1)[0] for line in actual}
+        differences = [
+            f"{name}: expected={expected_by_path.get(name, 'missing')} "
+            f"actual={actual_by_path.get(name, 'missing')}"
+            for name in sorted(expected_by_path.keys() | actual_by_path.keys())
+            if expected_by_path.get(name) != actual_by_path.get(name)
+        ]
+        raise SystemExit("core snapshot checksum mismatch\n" + "\n".join(differences))
 
 
 def sync(source: Path, destination: Path, tag: str | None, *, candidate: str | None = None) -> None:
