@@ -26,7 +26,8 @@ def digest(path: Path) -> str:
 
 def snapshot_files(root: Path) -> list[Path]:
     return sorted(
-        path for path in root.rglob("*") if path.is_file() and path.name != "SNAPSHOT.sha256"
+        (path for path in root.rglob("*") if path.is_file() and path.name != "SNAPSHOT.sha256"),
+        key=lambda path: path.relative_to(root).as_posix(),
     )
 
 
