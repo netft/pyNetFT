@@ -46,6 +46,8 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
+      - name: Verify controlled core snapshot
+        run: python tools/sync_core.py verify
       - name: Install wheel build frontend
         run: python -m pip install cibuildwheel==3.4.1 auditwheel
       - name: Build CPython 3.10 x86_64 wheel
@@ -85,6 +87,8 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
+      - name: Verify controlled core snapshot
+        run: python tools/sync_core.py verify
       - name: Install wheel build frontend
         run: python -m pip install cibuildwheel==3.4.1 delocate
       - name: Build CPython 3.10 native macOS wheel
@@ -116,6 +120,8 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
+      - name: Verify controlled core snapshot
+        run: python tools/sync_core.py verify
       - name: Install wheel build frontend
         run: python -m pip install cibuildwheel==3.4.1 pefile
       - name: Build CPython 3.10 Windows wheel
@@ -154,6 +160,8 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
+      - name: Verify controlled core snapshot
+        run: python tools/sync_core.py verify
       - name: Install wheel build frontend
         run: python -m pip install cibuildwheel==3.4.1 auditwheel
       - name: Build supported wheels
@@ -192,6 +200,8 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
+      - name: Verify controlled core snapshot
+        run: python tools/sync_core.py verify
       - name: Install wheel build frontend
         run: python -m pip install cibuildwheel==3.4.1 delocate
       - name: Build supported native macOS wheels
@@ -222,6 +232,8 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
+      - name: Verify controlled core snapshot
+        run: python tools/sync_core.py verify
       - name: Install wheel build frontend
         run: python -m pip install cibuildwheel==3.4.1 pefile
       - name: Build supported Windows wheels
