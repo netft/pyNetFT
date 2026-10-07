@@ -1,4 +1,4 @@
 repository=https://github.com/netft/netft-cpp
-tag=v0.3.3
-commit=3259b8576b16fb150b51e9ef9090366c5e6efcba
+tag=unreleased
+commit=8aec517a8d4baed66089e0e9d0928c90f8ebfadb
 paths=CMakeLists.txt,LICENSE,cmake,include,src

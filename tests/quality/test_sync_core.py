@@ -34,13 +34,16 @@ def test_sync_removes_files_outside_the_selected_snapshot(
     git(source, "add", ".")
     git(source, "commit", "-m", "fixture")
     git(source, "tag", "v-test")
+    git(source, "remote", "add", "origin", "https://github.com/netft/netft-cpp.git")
 
     destination = tmp_path / "core"
     destination.mkdir()
     stale = destination / "removed-upstream-path.txt"
     stale.write_text("stale\n", encoding="utf-8")
 
-    sync_core.sync(source, destination, "v-test")
+    sync_core.sync(source, destination, None, candidate=git(source, "rev-parse", "HEAD"))
 
     assert not stale.exists()
     sync_core.verify(destination)
+
+    assert "tag=unreleased" in (destination / "UPSTREAM").read_text()

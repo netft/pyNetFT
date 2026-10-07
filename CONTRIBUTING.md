@@ -124,3 +124,14 @@ Maintainers must verify the publisher owner, repository, workflow filename, and 
 Keep each pull request limited to one coherent change. Describe the problem, chosen behavior, tests run, supported platforms, hardware involvement, and any core or ROS synchronization impact. Update public documentation and `CHANGELOG.md` when users need to know about a change.
 
 All contributions are submitted under the [Apache License 2.0](https://github.com/netft/pyNetFT/blob/main/LICENSE). The prior pyNetFT MIT text and third-party license notices remain in `LICENSES/`.
+
+### Current core candidate
+
+The private snapshot uses unpublished upstream commit `8aec517a8d4baed66089e0e9d0928c90f8ebfadb`; `UPSTREAM` marks it `unreleased`. It is not the published v0.3.3 snapshot. Update from a clean upstream checkout using:
+
+```sh
+python tools/sync_core.py sync --source /path/to/netft-cpp --commit 8aec517a8d4baed66089e0e9d0928c90f8ebfadb
+python tools/sync_core.py verify
+```
+
+The manifest checks the selected bytes, including provenance. It detects drift and does not authenticate a remote release. Consumer build files remain private; fixes to core source belong upstream.
