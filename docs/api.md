@@ -109,11 +109,11 @@ If a callback raises, pyNetFT stops the run and stores the original exception. `
 | `recovery_policy` | `RecoveryPolicy` | `RECONNECT` | Reconnect after recoverable failures or stop on the first fault. |
 | `calibration_override` | `Calibration \| None` | `None` | Complete independently verified calibration; `None` discovers it from the sensor. |
 
-`Calibration(counts_per_force_unit, counts_per_torque_unit, force_unit, torque_unit)` is immutable. Both counts must be finite and positive. A calibration override is complete; force or torque values cannot be overridden independently.
+`Calibration(counts_per_force_unit, counts_per_torque_unit, force_unit, torque_unit)` is immutable. Both counts must be finite and positive. In the unreleased candidate they must also keep every signed 32-bit raw count representable after conversion. A calibration override is complete; force or torque values cannot be overridden independently.
 
 `SensorConfiguration(product_name, calibration, source, revision)` is immutable. `source` distinguishes sensor discovery from a caller override. `revision` changes when an effective configuration change is observed.
 
-Validation occurs when `Config` and `queue_size` are passed to `Client`. `queue_size` must be greater than zero. `sensor_host` must contain a non-whitespace host, and both ports must be in `1..65535`. All five configured timeout and reconnect-delay values must be finite and greater than zero; `reconnect_max_delay` must be at least `reconnect_initial_delay`. `sample_rate_limit_hz` must be finite and non-negative. A calibration override must have finite positive counts and neither unit may be `UNKNOWN`.
+Validation occurs when `Config` and `queue_size` are passed to `Client`. `queue_size` must be greater than zero. `sensor_host` must contain a non-whitespace host, and both ports must be in `1..65535`. All five configured timeout and reconnect-delay values must be finite and greater than zero; the unreleased candidate also checks native clock resolution/range and HTTP millisecond range; `reconnect_max_delay` must be at least `reconnect_initial_delay`. `sample_rate_limit_hz` must be finite and non-negative. A calibration override must have finite positive counts and neither unit may be `UNKNOWN`.
 
 The per-read timeout accepted by `samples()` must be finite, non-negative, and representable by the native monotonic clock; invalid values raise `ConfigurationError`. `wait_for_first_sample()` applies the same timeout validation.
 
@@ -184,3 +184,22 @@ NetFTError
 Its methods are `connect()`, `disconnect()`, `bias()`, `get_data()`, `get_converted_data()`, and `start_streaming(duration=10, delay=0.1, print_data=True)`. Reading or biasing before `connect()` raises `ConnectionError`. `Response` has mutable `rdt_sequence`, `ft_sequence`, `status`, and list-valued `FTData` fields.
 
 See the [2.0 migration guide](https://github.com/netft/pyNetFT/blob/main/docs/migration-2.md) for exact replacements.
+
+## Choose latest-value access or capture
+
+For displays and feedback that need current data, use `queue_size=1` and read `latest_sample()`; this does not consume the iterator queue. A latest-value view intentionally skips intermediate measurements. For capture, give one iterator consumer a queue sized for the longest expected consumer stall: delivered rate multiplied by stall seconds, plus headroom. At a synthetic 2000 samples/s and a 0.5 s stall, 4096 entries provides headroom; this is a sizing example, not a hardware specification.
+
+```python
+from itertools import islice
+from pynetft import Client, Config
+
+with Client(Config(sensor_host="192.168.1.1"), queue_size=4096) as client:
+    captured = list(islice(client.samples(timeout=1.0), 1000))
+    health = client.health()
+    if health.python_queue_dropped_count or health.lost_count:
+        raise RuntimeError("capture contains queue drops or missing RDT packets")
+```
+
+This example bounds retained samples and every iterator wait. Increasing queue size cannot eliminate network loss or sustain a consumer slower than the producer indefinitely. Inspect rate limiting, device status, malformed/out-of-order counters and recorded sequence numbers for your capture criteria. `python_queue_dropped_count` measures delivery-queue eviction; `lost_count` measures the native RDT sequence observation. Neither alone proves a complete measurement history.
+
+Legacy users should migrate `connect`/`disconnect` to `Client` context management, `get_data` to `samples` for capture, and `get_converted_data` to `Sample.wrench`. `latest_sample()` is suitable for polling the newest value. Preserve units explicitly: legacy manual calibration uses N/Nmm, whereas discovered samples carry the configured units. See the migration guide linked above for the full compatibility policy.
