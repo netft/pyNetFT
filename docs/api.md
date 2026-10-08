@@ -109,11 +109,11 @@ If a callback raises, pyNetFT stops the run and stores the original exception. `
 | `recovery_policy` | `RecoveryPolicy` | `RECONNECT` | Reconnect after recoverable failures or stop on the first fault. |
 | `calibration_override` | `Calibration \| None` | `None` | Complete independently verified calibration; `None` discovers it from the sensor. |
 
-`Calibration(counts_per_force_unit, counts_per_torque_unit, force_unit, torque_unit)` is immutable. Both counts must be finite and positive. In the unreleased candidate they must also keep every signed 32-bit raw count representable after conversion. A calibration override is complete; force or torque values cannot be overridden independently.
+`Calibration(counts_per_force_unit, counts_per_torque_unit, force_unit, torque_unit)` is immutable. Both counts must be finite and positive. Since 2.1.2 they must also keep every signed 32-bit raw count representable after conversion. A calibration override is complete; force or torque values cannot be overridden independently.
 
 `SensorConfiguration(product_name, calibration, source, revision)` is immutable. `source` distinguishes sensor discovery from a caller override. `revision` changes when an effective configuration change is observed.
 
-Validation occurs when `Config` and `queue_size` are passed to `Client`. `queue_size` must be greater than zero. `sensor_host` must contain a non-whitespace host, and both ports must be in `1..65535`. All five configured timeout and reconnect-delay values must be finite and greater than zero; the unreleased candidate also checks native clock resolution/range and HTTP millisecond range; `reconnect_max_delay` must be at least `reconnect_initial_delay`. `sample_rate_limit_hz` must be finite and non-negative. A calibration override must have finite positive counts and neither unit may be `UNKNOWN`.
+Validation occurs when `Config` and `queue_size` are passed to `Client`. `queue_size` must be greater than zero. `sensor_host` must contain a non-whitespace host, and both ports must be in `1..65535`. All five configured timeout and reconnect-delay values must be finite and greater than zero; this version also checks native clock resolution/range and HTTP millisecond range; `reconnect_max_delay` must be at least `reconnect_initial_delay`. `sample_rate_limit_hz` must be finite and non-negative. A calibration override must have finite positive counts and neither unit may be `UNKNOWN`.
 
 The per-read timeout accepted by `samples()` must be finite, non-negative, and representable by the native monotonic clock; invalid values raise `ConfigurationError`. `wait_for_first_sample()` applies the same timeout validation.
 
