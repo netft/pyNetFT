@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+## 2.1.2 - 2026-10-08
+
+- Integrate netft-cpp 0.3.4's calibration and checked-time protections.
+- Support exact-commit snapshot synchronization and pin reviewed build actions.
+- Explain latest-value versus bounded capture queues, drop counters, legacy migration and seven-repository maintenance.
+
 ## 2.1.1 - 2026-08-14
 
 ### Fixed

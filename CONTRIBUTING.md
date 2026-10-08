@@ -85,13 +85,17 @@ Pass the authorized address only through `NETFT_SENSOR_HOST`. Never commit it. T
 
 ## Cross-repository synchronization
 
-The `netft` organization maintains three separate repositories:
+The `netft` organization maintains seven separate repositories:
 
 - `netft-cpp` is the standalone C++ core and source of truth for shared protocol behavior;
 - `pyNetFT` contains a pinned private core snapshot, Python bindings, and the Python public API; and
-- `ros-netft` contains its own private core snapshot and ROS integration.
+- `ros-netft` contains its own private core snapshot and ROS integration;
+- `netft-cli` owns terminal workflows and its reviewed core adaptation;
+- `netft-viewer` owns desktop interaction, companion and packaging;
+- `netft-docs` maintains shared user guides and version-pinned references at https://netft.dev; and
+- `.github` maintains organization navigation, common templates and issue routing.
 
-There is no automatic runtime or build-time dependency between these repositories. Synchronize a released core into each consumer through separate, reviewable pull requests. Record the exact upstream tag and commit, port consumer-specific integration independently, run that repository's full supported tests, and document intentional differences. Do not claim the snapshots update in lockstep.
+There is no automatic runtime or build-time dependency between these repositories. Synchronize a released core into each consumer through separate, reviewable pull requests. Record the exact upstream tag and commit, port consumer-specific integration independently, run the necessary checks for the affected contract and supported release platforms, and document intentional differences. Do not claim the snapshots update in lockstep.
 
 ## Release workflow
 
@@ -124,3 +128,14 @@ Maintainers must verify the publisher owner, repository, workflow filename, and 
 Keep each pull request limited to one coherent change. Describe the problem, chosen behavior, tests run, supported platforms, hardware involvement, and any core or ROS synchronization impact. Update public documentation and `CHANGELOG.md` when users need to know about a change.
 
 All contributions are submitted under the [Apache License 2.0](https://github.com/netft/pyNetFT/blob/main/LICENSE). The prior pyNetFT MIT text and third-party license notices remain in `LICENSES/`.
+
+### Current core candidate
+
+The private snapshot uses the exact netft-cpp `v0.3.4` release commit `1ce68a08a9387d9a36d22c3c259e44533199c347`; `UPSTREAM` and its content manifest record that release identity. Update from a clean upstream checkout using:
+
+```sh
+python tools/sync_core.py sync --source /path/to/netft-cpp --tag v0.3.4
+python tools/sync_core.py verify
+```
+
+The manifest checks the selected bytes, including provenance. It detects drift and does not authenticate a remote release. Consumer build files remain private; fixes to core source belong upstream.

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 import shutil
 import subprocess
 import tempfile
@@ -25,7 +26,8 @@ def digest(path: Path) -> str:
 
 def snapshot_files(root: Path) -> list[Path]:
     return sorted(
-        path for path in root.rglob("*") if path.is_file() and path.name != "SNAPSHOT.sha256"
+        (path for path in root.rglob("*") if path.is_file() and path.name != "SNAPSHOT.sha256"),
+        key=lambda path: path.relative_to(root).as_posix(),
     )
 
 
@@ -42,11 +44,29 @@ def verify(root: Path) -> None:
         f"{digest(path)}  {path.relative_to(root).as_posix()}" for path in snapshot_files(root)
     ]
     if actual != expected:
-        raise SystemExit("core snapshot checksum mismatch")
+        expected_by_path = {line.split("  ", 1)[1]: line.split("  ", 1)[0] for line in expected}
+        actual_by_path = {line.split("  ", 1)[1]: line.split("  ", 1)[0] for line in actual}
+        differences = [
+            f"{name}: expected={expected_by_path.get(name, 'missing')} "
+            f"actual={actual_by_path.get(name, 'missing')}"
+            for name in sorted(expected_by_path.keys() | actual_by_path.keys())
+            if expected_by_path.get(name) != actual_by_path.get(name)
+        ]
+        raise SystemExit("core snapshot checksum mismatch\n" + "\n".join(differences))
 
 
-def sync(source: Path, destination: Path, tag: str) -> None:
-    commit = git(source, "rev-parse", f"{tag}^{{commit}}")
+def sync(source: Path, destination: Path, tag: str | None, *, candidate: str | None = None) -> None:
+    if candidate is not None and not re.fullmatch(r"[0-9a-f]{40}", candidate):
+        raise SystemExit("candidate must be a full lowercase commit SHA")
+    if git(source, "remote", "get-url", "origin") != "https://github.com/netft/netft-cpp.git":
+        raise SystemExit("source repository mismatch")
+    reference = candidate or tag
+    if not reference:
+        raise SystemExit("source identity is required")
+    commit = git(source, "rev-parse", f"{reference}^{{commit}}")
+    if candidate is not None and commit != candidate:
+        raise SystemExit("candidate identity mismatch")
+    tag = "unreleased" if candidate else tag
     head = git(source, "rev-parse", "HEAD")
     if head != commit:
         raise SystemExit(f"{source} HEAD does not match {tag}")
@@ -101,12 +121,14 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command", required=True)
     sync_parser = subparsers.add_parser("sync")
     sync_parser.add_argument("--source", type=Path, required=True)
-    sync_parser.add_argument("--tag", required=True)
+    identity = sync_parser.add_mutually_exclusive_group(required=True)
+    identity.add_argument("--tag")
+    identity.add_argument("--commit")
     subparsers.add_parser("verify")
     arguments = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     if arguments.command == "sync":
-        sync(arguments.source.resolve(), root / "core", arguments.tag)
+        sync(arguments.source.resolve(), root / "core", arguments.tag, candidate=arguments.commit)
     else:
         verify(root / "core")
 

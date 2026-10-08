@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(pynetft VERSION 2.1.1 LANGUAGES CXX)
+project(pynetft VERSION 2.1.2 LANGUAGES CXX)
 
 option(PYNETFT_BUILD_TESTING "Build pyNetFT native tests" OFF)
 

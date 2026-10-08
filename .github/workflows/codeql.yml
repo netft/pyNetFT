@@ -35,18 +35,18 @@ jobs:
           persist-credentials: false
       - name: Initialize Python CodeQL
         if: matrix.language == 'python'
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
       - name: Initialize C++ CodeQL with inline suppressions
         if: matrix.language == 'c-cpp'
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           packs: ${{ matrix.suppression-pack }}
-      - uses: prefix-dev/setup-pixi@v0.10.0
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
         if: matrix.language == 'c-cpp'
         with:
           cache: true
@@ -54,4 +54,4 @@ jobs:
         if: matrix.language == 'c-cpp'
         run: pixi run install
       - name: Analyze
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
