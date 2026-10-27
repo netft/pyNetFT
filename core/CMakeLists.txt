@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(netft VERSION 0.3.4 LANGUAGES CXX)
+project(netft VERSION 0.3.5 LANGUAGES CXX)
 
 include(CTest)
 include(GNUInstallDirs)
