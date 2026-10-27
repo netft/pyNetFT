@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+## 2.1.3 - 2026-10-27
+
+### Fixed
+
+- Integrate netft-cpp 0.3.5 so legacy devices that omit `prodname` can connect using their valid calibration. Missing product names display as `ATI Net F/T`; required calibration and malformed-name checks remain enforced.
+
 ## 2.1.2 - 2026-10-08
 
 - Integrate netft-cpp 0.3.4's calibration and checked-time protections.
